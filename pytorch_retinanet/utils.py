@@ -116,11 +116,11 @@ class EncoderDecoder:
         return pred_boxes.reshape(dims, -1, 4)
 
 
-def smooth_l1_loss(inp, targs):
+def smooth_l1_loss(inp: Tensor, targs: Tensor, reduction: str = 'mean'):
     """
     Computes `Smooth_L1_Loss`
     """
-    return F.smooth_l1_loss(inp, targs, size_average=True)
+    return F.smooth_l1_loss(inp, targs, reduction=reduction)
 
 
 # Set Values for IGNORE & BACKGROUND
@@ -173,13 +173,13 @@ class Matcher:
 
 
 def focal_loss(
-        inputs,
-        targets,
+        inputs: Tensor,
+        targets: Tensor,
         alpha: float = 0.25,
         gamma: float = 2,
-        reduction: str = "none"):
+        reduction: str = "mean"):
     """
-    Original implementation from https://github.com/facebookresearch/fvcore/blob/master/fvcore/nn/focal_loss.py .
+    From: https://github.com/facebookresearch/fvcore/blob/master/fvcore/nn/focal_loss.py .
 
     Args:
         inputs: A float tensor of arbitrary shape.
