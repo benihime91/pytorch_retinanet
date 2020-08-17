@@ -15,7 +15,7 @@ class Activ2BoxTransform(nn.Module):
     # >>> width = anc_w * exp(p_w)
     # The idea is that a prediction of `(0, 0, 0, 0)` corresponds to the anchor itself.
     # The next function converts the activations of the model in bounding boxes.
-    def __init__(self, scales: List[float], device: torch.device = torch.device('cpu')) -> None:
+    def __init__(self, scales: List[float] = None, device: torch.device = torch.device('cpu')) -> None:
         super(Activ2BoxTransform, self).__init__()
         scales = np.array(ifnone(scales, [0.1, 0.1, 0.2, 0.2]))
         self.scales = torch.from_numpy(scales).float().to(device)
@@ -25,15 +25,14 @@ class Activ2BoxTransform(nn.Module):
     def device(self):
         return self._device
 
-
     def forward(self, anchors, activations):
         """convert activations of the model into bounding boxes."""
 
         # Extract w,h,x_center,y_center from x1,y1,x2,y2 anchors.
-        widths  = anchors[:, :, 2] - anchors[:, :, 0]
+        widths = anchors[:, :, 2] - anchors[:, :, 0]
         heights = anchors[:, :, 3] - anchors[:, :, 1]
-        ctr_x   = anchors[:, :, 0] - 0.5 * widths
-        ctr_y   = anchors[:, :, 1] - 0.5 * heights
+        ctr_x = anchors[:, :, 0] - 0.5 * widths
+        ctr_y = anchors[:, :, 1] - 0.5 * heights
 
         # Get box regression transformation deltas(dx, dy, dw, dh) that can be used
         # to transform the `activations` into the `pred_boxes`.
@@ -45,8 +44,8 @@ class Activ2BoxTransform(nn.Module):
         # Extrapolate bounding boxes on anchors from the model activations.
         pred_ctr_x = ctr_x + dx * widths
         pred_ctr_y = ctr_y + dy * heights
-        pred_w     = torch.exp(dw) * widths
-        pred_h     = torch.exp(dh) * heights
+        pred_w = torch.exp(dw) * widths
+        pred_h = torch.exp(dh) * heights
 
         # Convert to x1y1x2y2 format
         pred_boxes_x1 = pred_ctr_x - 0.5 * pred_w
@@ -54,15 +53,17 @@ class Activ2BoxTransform(nn.Module):
         pred_boxes_x2 = pred_ctr_x + 0.5 * pred_w
         pred_boxes_y2 = pred_ctr_y + 0.5 * pred_h
 
-        pred_boxes = torch.stack([pred_boxes_x1, pred_boxes_y1, pred_boxes_x2, pred_boxes_y2], dim=2)
+        pred_boxes = torch.stack(
+            [pred_boxes_x1, pred_boxes_y1, pred_boxes_x2, pred_boxes_y2], dim=2)
         return pred_boxes
 
-    
+
 class ClipBoxes(nn.Module):
     '''
     Clip the `Height` & `Width` of the boxes to 
     the `Height` and `Width` of the Image.
     '''
+
     def __init__(self) -> None:
         super(ClipBoxes, self).__init__()
 

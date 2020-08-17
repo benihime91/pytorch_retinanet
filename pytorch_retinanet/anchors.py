@@ -114,7 +114,7 @@ class AnchorGenerator(nn.Module):
         return BufferList(cell_anchors)
 
     @staticmethod
-    def _compute_grid_offsets(size: List[int], stride: int, offset: float, device:torch.device):
+    def _compute_grid_offsets(size: List[int], stride: int, offset: float, device: torch.device):
         """Compute grid offsets of `size` with `stride`"""
         H, W = size
 
