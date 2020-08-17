@@ -10,7 +10,7 @@ A simple implementations of `Retinanet` for `object detection` as described in t
 ## TODO: 
 - [x] Create `Anchor Generator`.
 - [x] Create `ResNet` based `BackBone Model`.
-- [ ] Create `FPN` architecture as described in https://arxiv.org/abs/1612.03144.
+- [x] Create `FPN` architecture as described in https://arxiv.org/abs/1612.03144.
 - [ ] [Focal Loss](https://arxiv.org/abs/1708.02002) & `Regeression` and `Classification` Head for `Retinanet`.
 - [ ] Assemble Retinanet Using `BackBone` => `FPN` => `AnchorGenerator` => `Regeression` & `Classification` Head.
 - [x] Decode `Retinanet Predictions`. 
