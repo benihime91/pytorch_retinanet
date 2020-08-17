@@ -123,6 +123,11 @@ def smooth_l1_loss(inp, targs):
     return F.smooth_l1_loss(inp, targs, size_average=True)
 
 
+# Set Values for IGNORE & BACKGROUND
+IGNORE_IDX = -2
+BACKGROUND_IDX = -1
+
+
 class Matcher:
     """
     Match `anchors` to targets. -1 is match to background, -2 is ignore.
@@ -131,10 +136,10 @@ class Matcher:
 
     - for each anchor we take the maximum overlap possible with any of the targets.
 
-    - if that maximum overlap is less than 0.4, we match the anchor box to background, 
+    - if that maximum overlap is less than 0.4, we match the anchor box to background,
       the classifier's target will be that class.
 
-    - if the maximum overlap is greater than 0.5, we match the anchor box to that ground truth object. 
+    - if the maximum overlap is greater than 0.5, we match the anchor box to that ground truth object.
       The classifier's target will be the category of that target.
 
     - if the maximum overlap is between 0.4 and 0.5, we ignore that anchor in our loss computation.
@@ -152,15 +157,60 @@ class Matcher:
 
     def __call__(self, iou_vals: Tensor) -> Tensor:
         """
-        Args: 
-            iou_vals(Tensor):  A MxN Tensor containing the IOU vals between M ground_truths & N predicted elements. 
+        Args:
+            iou_vals(Tensor):  A MxN Tensor containing the IOU vals between M ground_truths & N predicted elements.
         """
         # Grab the best ground_truth overlap
         vals, idxs = iou_vals.max(dim=0)
 
         # Assign candidate matches with low quality to negative (unassigned) values
         # Threshold less than `back_thr` gets assigned -1 : background
-        idxs[vals < self.back_thr] = torch.tensor(-2)
+        idxs[vals < self.back_thr] = torch.tensor(BACKGROUND_IDX)
         # Threshold between `match_thr` & `back_thr` gets assigned -2: ignore
-        idxs[(vals >= self.back_thr) & (vals < self.match_thr)] = torch.tensor(-1)
+        idxs[(vals >= self.back_thr) & (
+            vals < self.match_thr)] = torch.tensor(IGNORE_IDX)
         return idxs
+
+
+def focal_loss(
+        inputs,
+        targets,
+        alpha: float = 0.25,
+        gamma: float = 2,
+        reduction: str = "none"):
+    """
+    Original implementation from https://github.com/facebookresearch/fvcore/blob/master/fvcore/nn/focal_loss.py .
+
+    Args:
+        inputs: A float tensor of arbitrary shape.
+                    The predictions for each example.
+        targets: A float tensor with the same shape as inputs. Stores the binary
+                    classification label for each element in inputs
+                    (0 for the negative class and 1 for the positive class).
+        alpha: (optional) Weighting factor in range (0,1) to balance
+                    positive vs negative examples or -1 for ignore. Default = 0.25
+        gamma: Exponent of the modulating factor (1 - p_t) to
+                balance easy vs hard examples.
+        reduction: 'none' | 'mean' | 'sum'
+                    'none': No reduction will be applied to the output.
+                    'mean': The output will be averaged.
+                    'sum': The output will be summed.
+    Returns:
+        Loss tensor with the reduction option applied.
+    """
+    p = inputs
+    ce_loss = F.binary_cross_entropy_with_logits(
+        inputs, targets, reduction="none")
+    p_t = p * targets + (1 - p) * (1 - targets)
+    loss = ce_loss * ((1 - p_t) ** gamma)
+
+    if alpha >= 0:
+        alpha_t = alpha * targets + (1 - alpha) * (1 - targets)
+        loss = alpha_t * loss
+
+    if reduction == "mean":
+        loss = loss.mean()
+    elif reduction == "sum":
+        loss = loss.sum()
+
+    return loss
