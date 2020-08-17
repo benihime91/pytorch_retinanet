@@ -1,5 +1,6 @@
 from pytorch_retinanet.anchors import AnchorGenerator
 from pytorch_retinanet.backbone import get_backbone
+from pytorch_retinanet.modelling import Retinanet
 import torch
 
 def test():

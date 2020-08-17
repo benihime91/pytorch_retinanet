@@ -1,9 +1,11 @@
+import math
+from typing import *
+
+import numpy as np
 import torch
 import torch.nn as nn
-from typing import *
+
 from .anchors import ifnone
-import numpy as np
-import math
 
 
 class Activ2BoxTransform(nn.Module):

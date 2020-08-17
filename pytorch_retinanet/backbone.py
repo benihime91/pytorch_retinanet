@@ -1,7 +1,8 @@
 from typing import Callable
-import torchvision
+
 import torch
 import torch.nn as nn
+import torchvision
 
 __all__ = ['resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152']
 
@@ -71,31 +72,31 @@ def get_backbone(kind: str = 'resnet18', pretrained: bool = True) -> nn.Module:
     return backbone
 
 
-if __name__ == '__main__':
-    m = get_backbone(kind='resnet18')
-    outs = m(torch.zeros(1, 3, 600, 600))
-    print('Resnet18 outputs', [o.shape for o in outs])
-    print()
+# if __name__ == '__main__':
+#     m = get_backbone(kind='resnet18')
+#     outs = m(torch.zeros(1, 3, 600, 600))
+#     print('Resnet18 outputs', [o.shape for o in outs])
+#     print()
 
-    m = get_backbone(kind='resnet34')
-    outs = m(torch.zeros(1, 3, 600, 600))
-    print('Resnet34 outputs', [o.shape for o in outs])
-    print()
+#     m = get_backbone(kind='resnet34')
+#     outs = m(torch.zeros(1, 3, 600, 600))
+#     print('Resnet34 outputs', [o.shape for o in outs])
+#     print()
 
-    m = get_backbone(kind='resnet50')
-    outs = m(torch.zeros(1, 3, 600, 600))
-    print('Resnet50 outputs', [o.shape for o in outs])
-    print()
+#     m = get_backbone(kind='resnet50')
+#     outs = m(torch.zeros(1, 3, 600, 600))
+#     print('Resnet50 outputs', [o.shape for o in outs])
+#     print()
 
-    m = get_backbone(kind='resnet101')
-    outs = m(torch.zeros(1, 3, 600, 600))
-    print('Resnet101 outputs', [o.shape for o in outs])
-    print()
+#     m = get_backbone(kind='resnet101')
+#     outs = m(torch.zeros(1, 3, 600, 600))
+#     print('Resnet101 outputs', [o.shape for o in outs])
+#     print()
 
-    m = get_backbone(kind='resnet152')
-    outs = m(torch.zeros(1, 3, 600, 600))
-    print('Resnet152 outputs', [o.shape for o in outs])
-    print()
+#     m = get_backbone(kind='resnet152')
+#     outs = m(torch.zeros(1, 3, 600, 600))
+#     print('Resnet152 outputs', [o.shape for o in outs])
+#     print()
 
     # m1 = get_backbone(kind='resnet50')
     # m2 = get_backbone(kind='resnet18')

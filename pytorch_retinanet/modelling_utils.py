@@ -1,16 +1,10 @@
-from typing import List
-from torch.functional import Tensor
-import torch.nn.functional as F
-import torch.nn as nn
-import torch
 import math
-from torchvision.ops import nms
-from .backbone import get_backbone
-from .anchors import AnchorGenerator
-from .utils import Activ2BoxTransform, ClipBoxes
+from typing import *
 
-__small__ = ['resnet18', 'resnet34']
-__big__ = ['resnet50', 'resnet101', 'resnet101', 'resnet152']
+import torch
+import torch.nn.functional as F
+from torch import nn
+from torch.functional import Tensor
 
 
 class FPN(nn.Module):
@@ -104,15 +98,31 @@ class BoxSubnet(nn.Module):
         self.output = nn.Conv2d(out_channels, num_anchors * 4, 3, padding=1)
         # out shape: [batch_size, (num_anchors * 4), height, width]
 
-    def forward(self, xb) -> Tensor:
-        x = self.box_subnet(xb)
-        x = self.output(x)
-        # Reshape output from :
-        # [batch_size, (num_anchors * 4), height, width] -> [batch_size, height, width, (num_anchors*4)]
-        x = x.permute(0, 2, 3, 1)
-        # Flatten output into shape: [batch_size, (height * width * num_anchors), 4]
-        # height * width * num_anchors =  Total number of anchors in the Feature Map.
-        return x.contiguous().view(x.shape[0], -1, 4)
+        torch.nn.init.normal_(self.output.weight, std=0.01)
+        torch.nn.init.zeros_(self.output.bias)
+
+        for layer in self.box_subnet.children():
+            if isinstance(layer, nn.Conv2d):
+                torch.nn.init.normal_(layer.weight, std=0.01)
+                torch.nn.init.zeros_(layer.bias)
+
+        self.num_anchors = num_anchors
+
+    def forward(self, xb: List[Tensor]) -> Tensor:
+        outputs = []
+
+        for features in xb:
+            x = self.box_subnet(features)
+            x = self.output(features)
+            # Reshape output from :
+            # (batch_size, 4 * num_anchors, H, W) -> (batch_size, H*W*num_anchors, 4).
+            N, _, H, W = x.shape
+            x = x.view(N, -1, 4, H, W)
+            x = x.permute(0, 3, 4, 1, 2)
+            x = x.reshape(N, -1, 4)  # Size=(N, HWA, 4)
+            outputs.append(x)
+
+        return outputs
 
 
 class ClassSubnet(nn.Module):
@@ -124,11 +134,11 @@ class ClassSubnet(nn.Module):
     `sigmoid` prediction.
 
     Args:
-        in_channels (int) : number of input channels.
-        num_classes  (int): total number of classes.
-        num_anchors  (int): no. of anchors per-spatial location.
-        prior (float)     : prior for `focal loss`.
-        out_channels (out): no. of channels for each conv_layer.
+        in_channels  (int) : number of input channels.
+        num_classes  (int) : total number of classes.
+        num_anchors  (int) : no. of anchors per-spatial location.
+        prior (float)      : prior for `focal loss`.
+        out_channels (out) : no. of channels for each conv_layer.
 
     Returns:
         Tensor of shape [None, (height * width * num_anchors), num_classes] 
@@ -141,6 +151,7 @@ class ClassSubnet(nn.Module):
                  num_anchors: int = 9,
                  prior: float = 0.01,
                  out_channels: int = 256) -> None:
+
         super(ClassSubnet, self).__init__()
         self.num_classes = num_classes
         self.num_anchors = num_anchors
@@ -159,64 +170,56 @@ class ClassSubnet(nn.Module):
         self.output = nn.Conv2d(
             out_channels, (num_anchors * num_classes), 3, padding=1)
 
-    def forward(self, xb) -> Tensor:
-        x = self.class_subnet(xb)
-        x = F.sigmoid(self.output(x))
-        # out : [batch_size, (num_anchors * num_classes), height, width]
-        x = x.permute(0, 2, 3, 1)
-        # out: [batch_size, height, width, (num_anchors * num_classes)]
-        batch_size, height, width, _ = x.shape
-        x = x.view(batch_size, height, width,
-                   self.num_anchors, self.num_classes)
-        x = x.contiguous().view(x.shape[0], -1, self.num_classes)
-        return x
+        for layer in self.class_subnet.children():
+            if isinstance(layer, nn.Conv2d):
+                torch.nn.init.normal_(layer.weight, std=0.01)
+                torch.nn.init.constant_(layer.bias, 0)
+
+        torch.nn.init.normal_(self.output.weight, std=0.01)
+        torch.nn.init.constant_(self.output.bias, -math.log((1-prior)/prior))
+
+    def forward(self, xb: List[Tensor]) -> Tensor:
+        outputs = []
+        for feature in xb:
+            x = self.class_subnet(feature)
+            x = F.sigmoid(self.output(feature))
+            # Permute classification output from :
+            # (batch_size, num_anchors * num_classes, H, W) to (batch_size, H * W * num_anchors, num_classes).
+            N, _, H, W = x.shape
+            x = x.view(N, -1, self.num_classes, H, W).permute(0, 3, 4, 1, 2)
+            x = x.reshape(N, -1, self.num_classes)
+            outputs.append(x)
+
+        outputs = torch.cat(outputs, dim=1)
+        return outputs
 
 
-class Retinanet(nn.Module):
+class RetinaNetHead(nn.Module):
     """
-    Implement RetinaNet in :paper:`RetinaNet`.
+    A Regression & Classification Head for use in RetinaNet.
+
+    Args:
+        in_channels(int)  : number of input channels.
+        out_channels (int): number of output feature channels.
+        num_anchors (int) : number of anchors per_spatial_location.
+        num_classes  (int): number of classes to be predicted.
+        prior      (float): value of `p estimated` by the model for the rare class (foreground) at the 
+                            start of training.
     """
 
     def __init__(self,
+                 in_channels: int,
                  num_classes: int,
-                 backbone_kind: str = 'resnet18',
+                 out_channels: int = 256,
                  num_anchors: int = 9,
-                 prior: float = 0.01,
-                 device: str = 'cpu',
-                 pretrained: bool = True) -> None:
+                 prior: float = 0.01) -> None:
+        super().__init__()
+        self.classification_head = ClassSubnet(
+            in_channels, num_classes, num_anchors, prior, out_channels)
+        self.regression_head = BoxSubnet(
+            in_channels, out_channels, num_anchors)
 
-        assert backbone_kind in __small__ + \
-            __big__, f" Expected `backbone_kind` to be one of {__small__+__big__} got {backbone_kind}"
-
-        # Get the back bone of the Model
-        self.backbone = get_backbone(backbone_kind, pretrained)
-
-        # Grab the backbone output channels
-        if backbone_kind in __small__:
-            self.fpn_szs = [
-                self.backbone.backbone.layer2[1].out_channels,
-                self.backbone.backbone.layer3[1].out_channels,
-                self.backbone.backbone.layer4[1].out_channels,
-            ]
-        elif backbone_kind in __big__:
-            self.fpn_szs = [
-                self.backbone.backbone.layer2[2].out_channels,
-                self.backbone.backbone.layer3[2].out_channels,
-                self.backbone.backbone.layer4[2].out_channels,
-            ]
-
-        # get the FPN
-        self.fpn = FPN(self.fpn_szs[0], self.fpn_szs[1],
-                       self.fpn_szs[2], out_channels=256)
-
-        self.class_subnet = ClassSubnet(in_channels=256,
-                                        num_classes=num_classes,
-                                        num_anchors=num_anchors,
-                                        prior=prior,
-                                        out_channels=256)
-
-        self.box_subnet = BoxSubnet(in_channels=256, out_channels=256)
-        self.anchor_generator = AnchorGenerator(device=torch.device(device))
-        self.activ2bbox = Activ2BoxTransform(device=torch.device(device))
-        self.clip_boxes = ClipBoxes()
-        self.focal_loss = None
+    def forward(self, xb: List[Tensor]) -> Dict[str, Tensor]:
+        cls_logits = self.classification_head(xb)
+        bbox_regressions = self.regression_head(xb)
+        return {'cls_logits': cls_logits, 'bbox_regression': bbox_regressions}
