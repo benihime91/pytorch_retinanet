@@ -118,7 +118,7 @@ class EncoderDecoder:
 
 def smooth_l1_loss(inp, targs):
     """
-    Computes Smooth `Smooth_L1_Loss`
+    Computes `Smooth_L1_Loss`
     """
     return F.smooth_l1_loss(inp, targs, size_average=True)
 
@@ -162,6 +162,5 @@ class Matcher:
         # Threshold less than `back_thr` gets assigned -1 : background
         idxs[vals < self.back_thr] = torch.tensor(-2)
         # Threshold between `match_thr` & `back_thr` gets assigned -2: ignore
-        idxs[(vals >= self.back_thr) & (
-            vals < self.match_thr)] = torch.tensor(-1)
+        idxs[(vals >= self.back_thr) & (vals < self.match_thr)] = torch.tensor(-1)
         return idxs
