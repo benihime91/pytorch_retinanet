@@ -13,7 +13,7 @@ A simple implementations of `Retinanet` for `object detection` as described in t
 - [x] Create `FPN` architecture as described in https://arxiv.org/abs/1612.03144.
 - [ ] [Focal Loss](https://arxiv.org/abs/1708.02002) & `Regeression` and `Classification` Head for `Retinanet`.
 - [ ] Assemble Retinanet Using `BackBone` => `FPN` => `AnchorGenerator` => `Regeression` & `Classification` Head.
-- [x] Decode `Retinanet Predictions`. 
+- [ ] Decode `Retinanet Predictions`. 
 - [ ] Create `Dataset` for Loading Custom Data. [Preferably from CSV].
 - [ ] Training Loop using `PyTorch Lightning`.
 - [ ] Inference for `single image` and `batches`.
