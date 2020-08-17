@@ -200,30 +200,3 @@ class AnchorGenerator(nn.Module):
         grid_sizes = [feature_map.shape[-2:] for feature_map in features]
         anchors_over_all_feature_maps = self.grid_anchors(grid_sizes)
         return [torch.clone(x) for x in anchors_over_all_feature_maps]
-
-
-# if __name__ == "__main__":
-#     import torchvision
-#     m1 = torchvision.models.resnet18()
-
-#     outputs = {}
-
-#     def hook_output(self, input, output):   outputs[self] = output
-
-#     m1.layer2.register_forward_hook(hook_output)
-#     m1.layer3.register_forward_hook(hook_output)
-#     m1.layer4.register_forward_hook(hook_output)
-
-#     _ = m1(torch.ones(1, 3, 600, 600))
-
-#     ag = AnchorGenerator()
-
-#     print(outputs[m1.layer2].shape, outputs[m1.layer4].shape, outputs[m1.layer3].shape)
-
-#     t1 = torch.ones_like(outputs[m1.layer2])
-#     t2 = torch.ones_like(outputs[m1.layer3])
-#     t3 = torch.ones_like(outputs[m1.layer4])
-#     feature_maps = [t1, t2, t2]
-
-#     out = ag(feature_maps)
-#     print(out)

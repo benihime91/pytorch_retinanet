@@ -4,6 +4,7 @@ from typing import *
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.functional import Tensor
 
 
@@ -45,7 +46,10 @@ def bbox_2_activ(ground_truth_boxes: Tensor, anchors: Tensor) -> Tensor:
 
 def activ_2_bbox(activations: Tensor, anchors: Tensor, clip_activ: float = math.log(1000. / 16)) -> Tensor:
     """Converts the `activations` of the `model` to bounding boxes."""
-    anchors = anchors.to(activations.dtype)
+
+    if anchors.device != activations.device:
+        anchors = anchors.to(activations.device)
+
     w = anchors[:, 2] - anchors[:, 0]
     h = anchors[:, 3] - anchors[:, 1]
     x = anchors[:, 0] + 0.5 * w
@@ -104,8 +108,16 @@ class EncoderDecoder:
         anchors = torch.cat(anchors, dim=0)
 
         dims = 0
+        # Calculate Total size of anchors
         for dim in anchors_per_image:
             dims += dim
 
         pred_boxes = activ_2_bbox(activations.reshape(dims, -1), anchors)
         return pred_boxes.reshape(dims, -1, 4)
+
+
+def smooth_l1_loss(inp, targs):
+    """
+    Computes Smooth `Smooth_L1_Loss`
+    """
+    return F.smooth_l1_loss(inp, targs, size_average=True)
