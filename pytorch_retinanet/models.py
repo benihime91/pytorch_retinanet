@@ -5,12 +5,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.functional import Tensor
-from torchvision.ops import nms
+from torchvision.ops.boxes import remove_small_boxes, nms, box_iou
 
 from .anchors import AnchorGenerator
 from .backbone import get_backbone
 from .modelling_utils import FPN, BoxSubnet, ClassSubnet, RetinaNetHead
-# from .utils import Activ2BoxTransform, ClipBoxes
+from .utils import EncoderDecoder, smooth_l1_loss
 
 __small__ = ['resnet18', 'resnet34']
 __big__ = ['resnet50', 'resnet101', 'resnet101', 'resnet152']

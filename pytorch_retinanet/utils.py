@@ -121,3 +121,47 @@ def smooth_l1_loss(inp, targs):
     Computes Smooth `Smooth_L1_Loss`
     """
     return F.smooth_l1_loss(inp, targs, size_average=True)
+
+
+class Matcher:
+    """
+    Match `anchors` to targets. -1 is match to background, -2 is ignore.
+
+    From : https://github.com/fastai/course-v3/blob/9c83dfbf9b9415456c9801d299d86e099b36c86d/nbs/dl2/pascal.ipynb
+
+    - for each anchor we take the maximum overlap possible with any of the targets.
+
+    - if that maximum overlap is less than 0.4, we match the anchor box to background, 
+      the classifier's target will be that class.
+
+    - if the maximum overlap is greater than 0.5, we match the anchor box to that ground truth object. 
+      The classifier's target will be the category of that target.
+
+    - if the maximum overlap is between 0.4 and 0.5, we ignore that anchor in our loss computation.
+    """
+
+    def __init__(self, match_thr: float = 0.5, back_thr: float = 0.4) -> None:
+        """
+        Args:
+            match_thr (float) : IOU values greater than or equal to this are `candidate values`.
+            back_thr (float)  : IOU values grater less than this are assigned either `ignore` or `-1`.
+        """
+        assert match_thr > back_thr, "Threshold for `match` should be greater than `background`"
+        self.match_thr = match_thr
+        self.back_thr = back_thr
+
+    def __call__(self, iou_vals: Tensor) -> Tensor:
+        """
+        Args: 
+            iou_vals(Tensor):  A MxN Tensor containing the IOU vals between M ground_truths & N predicted elements. 
+        """
+        # Grab the best ground_truth overlap
+        vals, idxs = iou_vals.max(dim=0)
+
+        # Assign candidate matches with low quality to negative (unassigned) values
+        # Threshold less than `back_thr` gets assigned -1 : background
+        idxs[vals < self.back_thr] = torch.tensor(-2)
+        # Threshold between `match_thr` & `back_thr` gets assigned -2: ignore
+        idxs[(vals >= self.back_thr) & (
+            vals < self.match_thr)] = torch.tensor(-1)
+        return idxs
