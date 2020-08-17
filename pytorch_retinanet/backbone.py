@@ -29,11 +29,11 @@ inter_outs = {}
 
 
 class BackBone(nn.Module):
-    def __init__(self, kind: str = 'resnet18', hook_fn: Callable = None) -> None:
+    def __init__(self, kind: str = 'resnet18', hook_fn: Callable = None, pretrained: bool = True) -> None:
         """Create a Backbone from `kind`"""
         super(BackBone, self).__init__()
         build_fn = funcs[kind]
-        self.backbone = build_fn(pretrained=True)
+        self.backbone = build_fn(pretrained=pretrained)
         self.backbone.avgpool = EmptyLayer()
         self.backbone.fc = EmptyLayer()
 
@@ -49,23 +49,24 @@ class BackBone(nn.Module):
         return out
 
 
-def get_backbone(kind: str = 'resnet18') -> nn.Module:
+def get_backbone(kind: str = 'resnet18', pretrained: bool = True) -> nn.Module:
     """
     Returns a `ResNet` Backbone.
 
     Args:
-        1. kind : (str) name of the resnet model eg: `resnet18`
+        1. kind       : (str) name of the resnet model eg: `resnet18`.
+        2. pretrained : (bool) wether to load pretrained weights.
 
     Example:
         >>> m = get_backbone(kind='resnet18')
     """
     assert kind in __all__, f"`kind` must be one of {__all__} got {kind}"
 
-    def hook_outputs(self, inp, out)->None:
+    def hook_outputs(self, inp, out) -> None:
         # Function to Hook Intermediate Outputs
         inter_outs[self] = out
 
-    backbone = BackBone(kind=kind, hook_fn=hook_outputs)
+    backbone = BackBone(kind=kind, hook_fn=hook_outputs, pretrained=pretrained)
 
     return backbone
 
@@ -91,4 +92,3 @@ def get_backbone(kind: str = 'resnet18') -> nn.Module:
 #     outs = m(torch.zeros(1, 3, 600, 600))
 #     print('Resnet152 outputs', [o.shape[-2:] for o in outs])
 #     print()
-
