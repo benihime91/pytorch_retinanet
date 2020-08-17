@@ -10,7 +10,7 @@ from torchvision.ops import nms
 from .anchors import AnchorGenerator
 from .backbone import get_backbone
 from .modelling_utils import FPN, BoxSubnet, ClassSubnet, RetinaNetHead
-from .utils import Activ2BoxTransform, ClipBoxes
+# from .utils import Activ2BoxTransform, ClipBoxes
 
 __small__ = ['resnet18', 'resnet34']
 __big__ = ['resnet50', 'resnet101', 'resnet101', 'resnet152']

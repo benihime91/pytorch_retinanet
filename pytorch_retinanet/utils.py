@@ -4,75 +4,108 @@ from typing import *
 import numpy as np
 import torch
 import torch.nn as nn
-
-from .anchors import ifnone
-
-
-class Activ2BoxTransform(nn.Module):
-    # For each anchor, we have one class predicted by the classifier and 4 floats `p_y, p_x, p_h, p_w` predicted by the regressor.
-    # If the corresponding anchor as a center in `anc_y`, `anc_x` with dimensions `anc_h`, `anc_w`,
-    # the predicted bounding box has those characteristics:
-    # >>> center = [p_y * anc_h + anc_y, p_x * anc_w + anc_x]
-    # >>> height = anc_h * exp(p_h)
-    # >>> width = anc_w * exp(p_w)
-    # The idea is that a prediction of `(0, 0, 0, 0)` corresponds to the anchor itself.
-    # The next function converts the activations of the model in bounding boxes.
-    def __init__(self, scales: List[float] = None, device: torch.device = torch.device('cpu')) -> None:
-        super(Activ2BoxTransform, self).__init__()
-        scales = np.array(ifnone(scales, [0.1, 0.1, 0.2, 0.2]))
-        self.scales = torch.from_numpy(scales).float().to(device)
-        self._device = device
-
-    @property
-    def device(self):
-        return self._device
-
-    def forward(self, anchors, activations):
-        """convert activations of the model into bounding boxes."""
-
-        # Extract w,h,x_center,y_center from x1,y1,x2,y2 anchors.
-        widths = anchors[:, :, 2] - anchors[:, :, 0]
-        heights = anchors[:, :, 3] - anchors[:, :, 1]
-        ctr_x = anchors[:, :, 0] - 0.5 * widths
-        ctr_y = anchors[:, :, 1] - 0.5 * heights
-
-        # Get box regression transformation deltas(dx, dy, dw, dh) that can be used
-        # to transform the `activations` into the `pred_boxes`.
-        dx = activations[:, :, 0] * self.scales[0]
-        dy = activations[:, :, 1] * self.scales[1]
-        dw = activations[:, :, 2] * self.scales[2]
-        dh = activations[:, :, 3] * self.scales[3]
-
-        # Extrapolate bounding boxes on anchors from the model activations.
-        pred_ctr_x = ctr_x + dx * widths
-        pred_ctr_y = ctr_y + dy * heights
-        pred_w = torch.exp(dw) * widths
-        pred_h = torch.exp(dh) * heights
-
-        # Convert to x1y1x2y2 format
-        pred_boxes_x1 = pred_ctr_x - 0.5 * pred_w
-        pred_boxes_y1 = pred_ctr_y - 0.5 * pred_h
-        pred_boxes_x2 = pred_ctr_x + 0.5 * pred_w
-        pred_boxes_y2 = pred_ctr_y + 0.5 * pred_h
-
-        pred_boxes = torch.stack(
-            [pred_boxes_x1, pred_boxes_y1, pred_boxes_x2, pred_boxes_y2], dim=2)
-        return pred_boxes
+from torch.functional import Tensor
 
 
-class ClipBoxes(nn.Module):
-    '''
-    Clip the `Height` & `Width` of the boxes to 
-    the `Height` and `Width` of the Image.
-    '''
+def bbox_2_activ(ground_truth_boxes: Tensor, anchors: Tensor) -> Tensor:
+    """
+    Convert `ground_truths` to match the model `activations` to calculate `loss`.
+    """
+    # Unpack Elements
+    anchors_x1 = anchors[:, 0].unsqueeze(1)
+    anchors_y1 = anchors[:, 1].unsqueeze(1)
+    anchors_x2 = anchors[:, 2].unsqueeze(1)
+    anchors_y2 = anchors[:, 3].unsqueeze(1)
 
-    def __init__(self) -> None:
-        super(ClipBoxes, self).__init__()
+    ground_truths_x1 = ground_truth_boxes[:, 0].unsqueeze(1)
+    ground_truths_y1 = ground_truth_boxes[:, 1].unsqueeze(1)
+    ground_truths_x2 = ground_truth_boxes[:, 2].unsqueeze(1)
+    ground_truths_y2 = ground_truth_boxes[:, 3].unsqueeze(1)
 
-    def forward(self, boxes, img):
-        batch_size, num_channels, height, width = img.shape
-        boxes[:, :, 0] = torch.clamp(boxes[:, :, 0], min=0)
-        boxes[:, :, 1] = torch.clamp(boxes[:, :, 1], min=0)
-        boxes[:, :, 2] = torch.clamp(boxes[:, :, 2], max=width)
-        boxes[:, :, 3] = torch.clamp(boxes[:, :, 3], max=height)
-        return boxes
+    # Calculate width, height, center_x, center_y
+    w = anchors_x2 - anchors_x1
+    h = anchors_y2 - anchors_y1
+    x = anchors_x1 + 0.5 * w
+    y = anchors_y1 + 0.5 * h
+
+    gt_w = ground_truths_x2 - ground_truths_x1
+    gt_h = ground_truths_y2 - ground_truths_y1
+    gt_x = ground_truths_x1 + 0.5 * gt_w
+    gt_y = ground_truths_y1 + 0.5 * gt_h
+
+    # Calculate Offsets
+    dx = (gt_x-x)/w
+    dy = (gt_y-y)/h
+    dw = torch.log(gt_w / w)
+    dh = torch.log(gt_h / h)
+
+    targets = torch.cat((dx, dy, dw, dh), dim=1)
+    return targets
+
+
+def activ_2_bbox(activations: Tensor, anchors: Tensor, clip_activ: float = math.log(1000. / 16)) -> Tensor:
+    """Converts the `activations` of the `model` to bounding boxes."""
+    anchors = anchors.to(activations.dtype)
+    w = anchors[:, 2] - anchors[:, 0]
+    h = anchors[:, 3] - anchors[:, 1]
+    x = anchors[:, 0] + 0.5 * w
+    y = anchors[:, 1] + 0.5 * h
+
+    dx = activations[:, 0::4]
+    dy = activations[:, 1::4]
+    dw = activations[:, 2::4]
+    dh = activations[:, 3::4]
+    # Clip activations
+    dw = torch.clamp(dw, max=clip_activ)
+    dh = torch.clamp(dh, max=clip_activ)
+
+    # Extrapolate bounding boxes on anchors from the model activations.
+    pred_ctr_x = x[:, None] + dx * w[:, None]
+    pred_ctr_y = y[:, None] + dy * h[:, None]
+    pred_w = torch.exp(dw) * w[:, None]
+    pred_h = torch.exp(dh) * h[:, None]
+
+    # Convert bbox shape from xywh to x1y1x2y2
+    pred_boxes1 = pred_ctr_x - \
+        torch.tensor(0.5, dtype=pred_ctr_x.dtype,
+                     device=pred_w.device) * pred_w
+    pred_boxes2 = pred_ctr_y - \
+        torch.tensor(0.5, dtype=pred_ctr_y.dtype,
+                     device=pred_h.device) * pred_h
+    pred_boxes3 = pred_ctr_x + \
+        torch.tensor(0.5, dtype=pred_ctr_x.dtype,
+                     device=pred_w.device) * pred_w
+    pred_boxes4 = pred_ctr_y + \
+        torch.tensor(0.5, dtype=pred_ctr_y.dtype,
+                     device=pred_h.device) * pred_h
+
+    # Stack the co-ordinates to the bbox co-ordinates.
+    pred_boxes = torch.stack(
+        (pred_boxes1, pred_boxes2, pred_boxes3, pred_boxes4), dim=2).flatten(1)
+
+    return pred_boxes
+
+
+class EncoderDecoder:
+    def encode(self, gt_bboxes: List[Tensor], anchors: List[Tensor]) -> List[Tensor]:
+        "Return the target of the model on `anchors` for the `gt_bboxes`."
+        boxes_per_image = [len(b) for b in gt_bboxes]
+        # Create Tensor from Given Lists
+        gt_bboxes = torch.cat(gt_bboxes, dim=0)
+        anchors = torch.cat(anchors, dim=0)
+        # computs targets of the model
+        targets = bbox_2_activ(gt_bboxes, anchors)
+        # convert to List
+        targets = targets.split(boxes_per_image, 0)
+        return targets
+
+    def decode(self, activations: Tensor, anchors: List[Tensor]) -> Tensor:
+        anchors_per_image = [a.size(0) for a in anchors]
+        anchors = torch.cat(anchors, dim=0)
+
+        dims = 0
+        for dim in anchors_per_image:
+            dims += dim
+
+        pred_boxes = activ_2_bbox(activations.reshape(dims, -1), anchors)
+        return pred_boxes.reshape(dims, -1, 4)
