@@ -8,6 +8,9 @@ from torch import device, nn
 from torch.functional import Tensor
 
 
+from . import config as cfg
+
+
 def ifnone(a: Any, b: Any) -> Any:
     '''`a` if `a` is not None, otherwise `b`'''
     if a is not None:
@@ -74,10 +77,10 @@ class AnchorGenerator(nn.Module):
     """
 
     def __init__(self,
-                 sizes: List[float] = None,
-                 aspect_ratios: List[float] = None,
-                 strides: List[int] = None,
-                 offset: float = 0.,
+                 sizes: List[float] = cfg.ANCHOR_SIZES,
+                 aspect_ratios: List[float] = cfg.ANCHOR_ASPECT_RATIOS,
+                 strides: List[int] = cfg.ANCHOR_STRIDES,
+                 offset: float = cfg.ANCHOR_OFFSET,
                  device: torch.device = torch.device('cpu')) -> None:
 
         super().__init__()
@@ -85,12 +88,7 @@ class AnchorGenerator(nn.Module):
         # at each pyramid level we use anchors at three aspect ratios {1:2; 1:1, 2:1}
         # at each anchor level we add anchors of sizes {2**0, 2**(1/3), 2**(2/3)} of the original set of 3 anchors
         # In total there are A=9 anchors at each feature map for each pixel
-        sizes = ifnone(sizes, [[x, x * 2**(1/3), x * 2**(2/3)]
-                               for x in [32, 64, 128, 256, 512]])
-
-        strides = ifnone(strides, [8, 16, 32, 64, 128])
-
-        aspect_ratios = ifnone(aspect_ratios, [0.5, 1.0, 2.0])
+        
 
         self.strides = strides
         self.num_features = len(strides)

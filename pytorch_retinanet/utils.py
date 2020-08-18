@@ -6,6 +6,8 @@ import torch.nn.functional as F
 from torch.functional import Tensor
 from torchvision.ops.boxes import box_iou
 
+from . import config as cfg
+
 
 def bbox_2_activ(ground_truth_boxes: Tensor, anchors: Tensor) -> Tensor:
     """
@@ -34,16 +36,19 @@ def bbox_2_activ(ground_truth_boxes: Tensor, anchors: Tensor) -> Tensor:
     gt_y = ground_truths_y1 + 0.5 * gt_h
 
     # Calculate Offsets
-    dx = (gt_x-x)/w
-    dy = (gt_y-y)/h
-    dw = torch.log(gt_w / w)
-    dh = torch.log(gt_h / h)
+    dx = cfg.BBOX_REG_WEIGHTS[0] * (gt_x-x) / w
+    dy = cfg.BBOX_REG_WEIGHTS[1] * (gt_y-y) / h
+    dw = cfg.BBOX_REG_WEIGHTS[2] * torch.log(gt_w / w)
+    dh = cfg.BBOX_REG_WEIGHTS[3] * torch.log(gt_h / h)
 
     targets = torch.cat((dx, dy, dw, dh), dim=1)
     return targets
 
 
-def activ_2_bbox(activations: Tensor, anchors: Tensor, clip_activ: float = math.log(1000. / 16)) -> Tensor:
+def activ_2_bbox(
+        activations: Tensor,
+        anchors: Tensor,
+        clip_activ: float = math.log(1000. / 16)) -> Tensor:
     "Converts the `activations` of the `model` to bounding boxes."
 
     if anchors.device != activations.device:
@@ -54,10 +59,10 @@ def activ_2_bbox(activations: Tensor, anchors: Tensor, clip_activ: float = math.
     ctr_x = anchors[:, 0] + 0.5 * w
     ctr_y = anchors[:, 1] + 0.5 * h
 
-    dx = activations[:, 0::4]
-    dy = activations[:, 1::4]
-    dw = activations[:, 2::4]
-    dh = activations[:, 3::4]
+    dx = activations[:, 0::4] / cfg.BBOX_REG_WEIGHTS[0]
+    dy = activations[:, 1::4] / cfg.BBOX_REG_WEIGHTS[1]
+    dw = activations[:, 2::4] / cfg.BBOX_REG_WEIGHTS[2]
+    dh = activations[:, 3::4] / cfg.BBOX_REG_WEIGHTS[3]
     # Clip activations
     dw = torch.clamp(dw, max=clip_activ)
     dh = torch.clamp(dh, max=clip_activ)
@@ -96,12 +101,15 @@ def smooth_l1_loss(inp: Tensor, targs: Tensor, reduction: str = 'mean'):
     return F.smooth_l1_loss(inp, targs, reduction=reduction)
 
 
-# Set Values for IGNORE & BACKGROUND
-IGNORE_IDX = -2
-BACKGROUND_IDX = -1
+IGNORE_IDX = cfg.IGNORE_IDX
+BACKGROUND_IDX = cfg.BACKGROUND_IDX
 
 
-def matcher(targets, anchors, match_thr: float = 0.5, back_thr: float = 0.4) -> Tensor:
+def matcher(
+        targets: Tensor,
+        anchors: Tensor,
+        match_thr: float = cfg.IOU_THRESHOLDS_FOREGROUND,
+        back_thr: float = cfg.IOU_THRESHOLDS_BACKGROUND) -> Tensor:
     """
     Match `anchors` to targets. -1 is match to background, -2 is ignore.
     """
@@ -133,8 +141,8 @@ def matcher(targets, anchors, match_thr: float = 0.5, back_thr: float = 0.4) -> 
 def focal_loss(
         inputs: Tensor,
         targets: Tensor,
-        alpha: float = 0.25,
-        gamma: float = 2,
+        alpha: float = cfg.FOCAL_LOSS_ALPHA,
+        gamma: float = cfg.FOCAL_LOSS_GAMMA,
         reduction: str = "mean"):
     """
     From: https://github.com/facebookresearch/fvcore/blob/master/fvcore/nn/focal_loss.py .
@@ -174,7 +182,10 @@ def focal_loss(
     return loss
 
 
-def retinanet_loss(targets: List[Dict[str, Tensor]], outputs: Dict[str, Tensor], anchors: List[Tensor]):
+def retinanet_loss(
+        targets: List[Dict[str, Tensor]],
+        outputs: Dict[str, Tensor],
+        anchors: List[Tensor]):
     """
     Loss for the `classification subnet` & `regression subnet` of `RetinaNet`
     """
@@ -248,9 +259,11 @@ def retinanet_loss(targets: List[Dict[str, Tensor]], outputs: Dict[str, Tensor],
         target_regression = bbox_2_activ(matched_gt_boxes_per_image, ancs)
 
         # compute the loss
-        bbox_regress_loss += smooth_l1_loss(bbox_pred,
-                                            target_regression,
-                                            reduction="sum") / max(1, num_foreground)
+        bbox_regress_loss += (
+            smooth_l1_loss(
+                bbox_pred,
+                target_regression,
+                reduction="sum") / max(1, num_foreground))
 
         loss_dict = {"classification_loss": classification_loss / max(1, len(targets)),
                      "bbox_regression_loss": bbox_regress_loss / max(1, len(targets))}

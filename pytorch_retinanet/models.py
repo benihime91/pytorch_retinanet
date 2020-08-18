@@ -6,6 +6,8 @@ from torch.functional import Tensor
 from torchvision.models.detection.transform import GeneralizedRCNNTransform
 from torchvision.ops.boxes import clip_boxes_to_image, nms, remove_small_boxes
 
+
+from . import config as cfg
 from .anchors import AnchorGenerator
 from .layers import FPN, RetinaNetHead, get_backbone
 from .utils import activ_2_bbox
@@ -22,14 +24,14 @@ class Retinanet(nn.Module):
     """
 
     def __init__(self,
-                 num_classes: int,
-                 backbone_kind: str = 'resnet18',
-                 prior: float = 0.01,
-                 pretrained: bool = True,
-                 nms_thres: float = 0.5,
-                 score_thres: float = 0.05,
-                 max_detections_per_images: int = 300,
-                 freeze_bn: bool = True) -> None:
+                 num_classes: int = cfg.NUM_CLASSES,
+                 backbone_kind: str = cfg.BACKBONE,
+                 prior: float = cfg.PRIOR,
+                 pretrained: bool = cfg.PRETRAINED_BACKBONE,
+                 nms_thres: float = cfg.NMS_THRES,
+                 score_thres: float = cfg.SCORE_THRES,
+                 max_detections_per_images: int = cfg.MAX_DETECTIONS_PER_IMAGE,
+                 freeze_bn: bool = cfg.FREEZE_BN) -> None:
 
         # The reason for the 0.05 is because that is what appears to be used by other systems as well,
         # such as faster rcnn and Detectron.
@@ -40,9 +42,12 @@ class Retinanet(nn.Module):
 
         # Instantiate `GeneralizedRCNNTransform to Resize Images`
         # Transoforms Input Images
-        # Imagenet Mean & std
-        mean, std = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
-        self.pre_tfms = GeneralizedRCNNTransform(600, 1200, mean, std)
+        self.pre_tfms = (
+            GeneralizedRCNNTransform(
+                cfg.MIN_IMAGE_SIZE,
+                cfg.MAX_IMAGE_SIZE,
+                cfg.MEAN,
+                cfg.STD))
 
         # Get the back bone of the Model
         self.backbone = (

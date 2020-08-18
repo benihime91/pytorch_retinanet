@@ -4,8 +4,9 @@ import torch
 warnings.filterwarnings('ignore')
 
 if __name__ == "__main__":
-    model = Retinanet(num_classes=8, backbone_kind='resnet18', pretrained=False)
+    model = Retinanet()
     z = torch.rand([3, 3, 600, 600])
     model.eval()
+    print(model)
     outputs = model(z)
     print(f" --> OUTPUTS:\n{outputs}")

@@ -8,6 +8,8 @@ import torchvision
 from torch import nn as nn
 from torch.functional import Tensor
 
+
+from . import config as cfg
 from .utils import retinanet_loss
 
 __all__ = ['resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152']
@@ -248,7 +250,7 @@ class ClassSubnet(nn.Module):
                  in_channels: int,
                  num_classes: int,
                  num_anchors: int = 9,
-                 prior: float = 0.01,
+                 prior: float = cfg.PRIOR,
                  out_channels: int = 256) -> None:
 
         super(ClassSubnet, self).__init__()
@@ -315,7 +317,7 @@ class RetinaNetHead(nn.Module):
                  num_classes: int,
                  out_channels: int = 256,
                  num_anchors: int = 9,
-                 prior: float = 0.01) -> None:
+                 prior: float = cfg.PRIOR) -> None:
 
         super(RetinaNetHead, self).__init__()
 
