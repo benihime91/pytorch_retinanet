@@ -28,7 +28,8 @@ class Retinanet(nn.Module):
                  pretrained: bool = True,
                  nms_thres: float = 0.5,
                  score_thres: float = 0.05,
-                 max_detections_per_images: int = 300) -> None:
+                 max_detections_per_images: int = 300,
+                 freeze_bn: bool = True) -> None:
 
         # The reason for the 0.05 is because that is what appears to be used by other systems as well,
         # such as faster rcnn and Detectron.
@@ -37,14 +38,18 @@ class Retinanet(nn.Module):
         assert backbone_kind in __small__ + \
             __big__, f" Expected `backbone_kind` to be one of {__small__+__big__} got {backbone_kind}"
 
-        # Instantiate `GeneralizedECNNTransform to Resize Images`
+        # Instantiate `GeneralizedRCNNTransform to Resize Images`
         # Transoforms Input Images
         # Imagenet Mean & std
         mean, std = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
         self.pre_tfms = GeneralizedRCNNTransform(600, 1200, mean, std)
 
         # Get the back bone of the Model
-        self.backbone = get_backbone(backbone_kind, pretrained)
+        self.backbone = (
+            get_backbone(
+                backbone_kind,
+                pretrained,
+                freeze_bn=freeze_bn))
 
         # Grab the backbone output channels
         if backbone_kind in __small__:
@@ -136,8 +141,10 @@ class Retinanet(nn.Module):
                     pred_box_per_cls[keep_mask], pred_cls_per_cls[keep_mask], pred_lbl_per_cls[keep_mask]
 
                 # 2. Do NMS
-                keep_mask = nms(pred_box_per_cls,
-                                pred_cls_per_cls, self.nms_thres)
+                keep_mask = nms(
+                    pred_box_per_cls,
+                    pred_cls_per_cls,
+                    self.nms_thres)
 
                 # 3. Keep top classes upto `detections_per_images`
                 keep_mask = keep_mask[:self.detections_per_images]
@@ -153,7 +160,7 @@ class Retinanet(nn.Module):
 
             # Update Detection Dictionary
             detections.append({
-                'boxes':  torch.cat(all_boxes,   dim=0),
+                'boxes':  torch.cat(all_boxes, dim=0),
                 'scores': torch.cat(all_scores, dim=0),
                 'labels': torch.cat(all_labels, dim=0),
             })

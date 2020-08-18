@@ -22,7 +22,7 @@ funcs = {
 
 
 class EmptyLayer(nn.Module):
-    """PlaceHolder for AvgPool and FC Layer"""
+    " PlaceHolder for `AvgPool` and `FC Layer` "
 
     def __init__(self) -> None:
         super(EmptyLayer, self).__init__()
@@ -36,7 +36,11 @@ inter_outs = {}
 
 
 class BackBone(nn.Module):
-    def __init__(self, kind: str = 'resnet18', hook_fn: Callable = None, pretrained: bool = True) -> None:
+    def __init__(self,
+                 kind: str = 'resnet18',
+                 hook_fn: Callable = None,
+                 pretrained: bool = True,
+                 freeze_bn: bool = True) -> None:
         """Create a Backbone from `kind`"""
         super(BackBone, self).__init__()
         build_fn = funcs[kind]
@@ -49,14 +53,25 @@ class BackBone(nn.Module):
         self.backbone.layer3.register_forward_hook(hook_fn)
         self.backbone.layer4.register_forward_hook(hook_fn)
 
+        # Freeze batch_norm: Not sure why ?? but every other implementation does it
+        if freeze_bn:
+            for layer in self.modules():
+                if isinstance(layer, nn.BatchNorm2d):
+                    layer.eval()
+
     def forward(self, xb: Tensor) -> List[Tensor]:
         _ = self.backbone(xb)
-        out = [inter_outs[self.backbone.layer2],
-               inter_outs[self.backbone.layer3], inter_outs[self.backbone.layer4]]
+        out = [
+            inter_outs[self.backbone.layer2],
+            inter_outs[self.backbone.layer3],
+            inter_outs[self.backbone.layer4]
+        ]
         return out
 
 
-def get_backbone(kind: str = 'resnet18', pretrained: bool = True) -> nn.Module:
+def get_backbone(kind: str = 'resnet18',
+                 pretrained: bool = True,
+                 freeze_bn: bool = True) -> nn.Module:
     """
     Returns a `ResNet` Backbone.
 
@@ -73,7 +88,10 @@ def get_backbone(kind: str = 'resnet18', pretrained: bool = True) -> nn.Module:
         # Function to Hook Intermediate Outputs
         inter_outs[self] = out
 
-    backbone = BackBone(kind=kind, hook_fn=hook_outputs, pretrained=pretrained)
+    backbone = BackBone(kind=kind,
+                        hook_fn=hook_outputs,
+                        pretrained=pretrained,
+                        freeze_bn=freeze_bn)
 
     return backbone
 
@@ -135,6 +153,7 @@ class FPN(nn.Module):
         p6_output = self.conv_c6_3x3(C5)
         # `p7` is computed by applying `ReLU` followed a `3x3 stride-2 conv` on `p6`
         p7_output = self.conv_c7_3x3(F.relu(p6_output))
+
         return [p3_output, p4_output, p5_output, p6_output, p7_output]
 
 
@@ -264,13 +283,14 @@ class ClassSubnet(nn.Module):
 
         for feature in xb:
             x = self.class_subnet(feature)
-            x = F.sigmoid(self.output(x))
+            # `F.sigmoid` is `deprecated`
+            x = torch.sigmoid(self.output(x))
             # Permute classification output from :
             # (batch_size, num_anchors * num_classes, H, W) to (batch_size, H * W * num_anchors, num_classes).
             N, _, H, W = x.shape
             x = x.view(N, -1, self.num_classes, H, W).permute(0, 3, 4, 1, 2)
             x = x.reshape(N, -1, self.num_classes)
-            
+
             outputs.append(x)
 
         outputs = torch.cat(outputs, dim=1)
@@ -296,19 +316,33 @@ class RetinaNetHead(nn.Module):
                  out_channels: int = 256,
                  num_anchors: int = 9,
                  prior: float = 0.01) -> None:
+
         super(RetinaNetHead, self).__init__()
 
-        self.classification_head = ClassSubnet(
-            in_channels, num_classes, num_anchors, prior, out_channels)
+        # Initialize `ClassSubnet`
+        self.classification_head = (
+            ClassSubnet(in_channels,
+                        num_classes,
+                        num_anchors,
+                        prior,
+                        out_channels))
 
-        self.regression_head = BoxSubnet(
-            in_channels, out_channels, num_anchors)
+        # Initialize `BoxSubnet`
+        self.regression_head = (
+            BoxSubnet(in_channels,
+                      out_channels,
+                      num_anchors))
 
     def forward(self, xb: List[Tensor]) -> Dict[str, Tensor]:
         cls_logits = self.classification_head(xb)
         bbox_regressions = self.regression_head(xb)
+
         return {'logits': cls_logits, 'bboxes': bbox_regressions}
 
-    def retinanet_focal_loss(self, targets: List[Dict[str, Tensor]], ouptuts: Dict[str, Tensor], anchors: List[Tensor]):
+    def retinanet_focal_loss(self,
+                             targets: List[Dict[str, Tensor]],
+                             ouptuts: Dict[str, Tensor],
+                             anchors: List[Tensor]):
+
         loss = retinanet_loss(targets, ouptuts, anchors)
         return loss
