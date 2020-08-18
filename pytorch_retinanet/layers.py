@@ -124,6 +124,7 @@ class FPN(nn.Module):
         # Upsample & add ouputs[element-wise]: (p4 and p5) & (p3 and p4)
         p4_output = p4_output + self.upsample_2x(p5_output)
         p3_output = p3_output + self.upsample_2x(p4_output)
+
         # `3x3 stride-1 Convs` to obtain `p3`, `p4`, `p5`
         p3_output = self.conv_c3_3x3(p3_output)
         p4_output = self.conv_c4_3x3(p4_output)
@@ -191,12 +192,14 @@ class BoxSubnet(nn.Module):
         for features in xb:
             x = self.box_subnet(features)
             x = self.output(x)
+
             # Reshape output from :
             # (batch_size, 4 * num_anchors, H, W) -> (batch_size, H*W*num_anchors, 4).
             N, _, H, W = x.shape
             x = x.view(N, -1, 4, H, W)
             x = x.permute(0, 3, 4, 1, 2)
             x = x.reshape(N, -1, 4)  # Size=(N, HWA, 4)
+
             outputs.append(x)
 
         return torch.cat(outputs, dim=1)
@@ -267,6 +270,7 @@ class ClassSubnet(nn.Module):
             N, _, H, W = x.shape
             x = x.view(N, -1, self.num_classes, H, W).permute(0, 3, 4, 1, 2)
             x = x.reshape(N, -1, self.num_classes)
+            
             outputs.append(x)
 
         outputs = torch.cat(outputs, dim=1)
@@ -293,8 +297,10 @@ class RetinaNetHead(nn.Module):
                  num_anchors: int = 9,
                  prior: float = 0.01) -> None:
         super(RetinaNetHead, self).__init__()
+
         self.classification_head = ClassSubnet(
             in_channels, num_classes, num_anchors, prior, out_channels)
+
         self.regression_head = BoxSubnet(
             in_channels, out_channels, num_anchors)
 

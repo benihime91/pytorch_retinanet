@@ -52,8 +52,8 @@ def activ_2_bbox(activations: Tensor, anchors: Tensor, clip_activ: float = math.
     if anchors.device != activations.device:
         anchors = anchors.to(activations.device)
 
-    w = anchors[:, 2] - anchors[:, 0]
-    h = anchors[:, 3] - anchors[:, 1]
+    w     = anchors[:, 2] - anchors[:, 0]
+    h     = anchors[:, 3] - anchors[:, 1]
     ctr_x = anchors[:, 0] + 0.5 * w
     ctr_y = anchors[:, 1] + 0.5 * h
 

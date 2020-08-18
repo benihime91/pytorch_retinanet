@@ -175,8 +175,10 @@ class Retinanet(nn.Module):
         # Get `head_outputs` from `RetinaNetHead`
         head_outputs = self.retinanet_head(outputs)
 
+        # print(head_outputs['bboxes'].shape)
         # create anchors
         anchors = self.anchor_generator(feature_maps)
+        # print([anchors.shape for anchors in anchors])
 
         losses = {}
         detections = {}

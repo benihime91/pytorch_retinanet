@@ -203,4 +203,5 @@ class AnchorGenerator(nn.Module):
         """
         grid_sizes = [feature_map.shape[-2:] for feature_map in features]
         anchors_over_all_feature_maps = self.grid_anchors(grid_sizes)
-        return [torch.clone(x) for x in anchors_over_all_feature_maps]
+        anchors = [torch.cat(anchors_over_all_feature_maps, dim=0)]
+        return anchors
