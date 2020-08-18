@@ -8,7 +8,7 @@ from torchvision.ops.boxes import clip_boxes_to_image, nms, remove_small_boxes
 
 
 from . import config as cfg
-from .anchors import AnchorGenerator
+from .anchors import AnchorGenerator, ifnone
 from .layers import FPN, RetinaNetHead, get_backbone
 from .utils import activ_2_bbox
 
@@ -31,7 +31,8 @@ class Retinanet(nn.Module):
                  nms_thres: float = cfg.NMS_THRES,
                  score_thres: float = cfg.SCORE_THRES,
                  max_detections_per_images: int = cfg.MAX_DETECTIONS_PER_IMAGE,
-                 freeze_bn: bool = cfg.FREEZE_BN) -> None:
+                 freeze_bn: bool = cfg.FREEZE_BN,
+                 anchor_generator: Callable = None) -> None:
 
         # The reason for the 0.05 is because that is what appears to be used by other systems as well,
         # such as faster rcnn and Detectron.
@@ -75,7 +76,7 @@ class Retinanet(nn.Module):
                        self.fpn_szs[2], out_channels=256)
 
         # Instantiate anchor Generator
-        self.anchor_generator = AnchorGenerator()
+        self.anchor_generator = ifnone(anchor_generator, AnchorGenerator())
         self.num_anchors = self.anchor_generator.num_cell_anchors[0]
 
         # Instantiate `RetinaNetHead`
