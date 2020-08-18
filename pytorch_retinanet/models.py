@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.functional import Tensor
-from torchvision.ops.boxes import remove_small_boxes, nms, box_iou
+from torchvision.ops.boxes import box_iou, nms, remove_small_boxes
 
 from .anchors import AnchorGenerator
 from .backbone import get_backbone

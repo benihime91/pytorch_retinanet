@@ -5,6 +5,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 from torch.functional import Tensor
+from .utils import retinanet_loss
 
 
 class FPN(nn.Module):
@@ -222,4 +223,8 @@ class RetinaNetHead(nn.Module):
     def forward(self, xb: List[Tensor]) -> Dict[str, Tensor]:
         cls_logits = self.classification_head(xb)
         bbox_regressions = self.regression_head(xb)
-        return {'cls_logits': cls_logits, 'bbox_regression': bbox_regressions}
+        return {'logits': cls_logits, 'bboxes': bbox_regressions}
+
+    def retinanet_focal_loss(self, targets: List[Dict[str, Tensor]], ouptuts: Dict[str, Tensor], anchors: List[Tensor]):
+        loss = retinanet_loss(targets, ouptuts, anchors)
+        return loss

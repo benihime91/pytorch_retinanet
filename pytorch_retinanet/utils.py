@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.functional import Tensor
+from torchvision.ops.boxes import box_iou
 
 
 def bbox_2_activ(ground_truth_boxes: Tensor, anchors: Tensor) -> Tensor:
@@ -128,48 +129,33 @@ IGNORE_IDX = -2
 BACKGROUND_IDX = -1
 
 
-class Matcher:
+def matcher(targets, anchors, match_thr: float = 0.5, back_thr: float = 0.4) -> Tensor:
     """
     Match `anchors` to targets. -1 is match to background, -2 is ignore.
-
-    From : https://github.com/fastai/course-v3/blob/9c83dfbf9b9415456c9801d299d86e099b36c86d/nbs/dl2/pascal.ipynb
-
-    - for each anchor we take the maximum overlap possible with any of the targets.
-
-    - if that maximum overlap is less than 0.4, we match the anchor box to background,
-      the classifier's target will be that class.
-
-    - if the maximum overlap is greater than 0.5, we match the anchor box to that ground truth object.
-      The classifier's target will be the category of that target.
-
-    - if the maximum overlap is between 0.4 and 0.5, we ignore that anchor in our loss computation.
     """
+    # From: https: // github.com/fastai/course-v3/blob/9c83dfbf9b9415456c9801d299d86e099b36c86d/nbs/dl2/pascal.ipynb
+    # - for each anchor we take the maximum overlap possible with any of the targets.
+    # - if that maximum overlap is less than 0.4, we match the anchor box to background,
+    # the classifier's target will be that class.
+    # - if the maximum overlap is greater than 0.5, we match the anchor box to that ground truth object.
+    # The classifier's target will be the category of that target.
+    # - if the maximum overlap is between 0.4 and 0.5, we ignore that anchor in our loss computation.
 
-    def __init__(self, match_thr: float = 0.5, back_thr: float = 0.4) -> None:
-        """
-        Args:
-            match_thr (float) : IOU values greater than or equal to this are `candidate values`.
-            back_thr (float)  : IOU values grater less than this are assigned either `ignore` or `-1`.
-        """
-        assert match_thr > back_thr, "Threshold for `match` should be greater than `background`"
-        self.match_thr = match_thr
-        self.back_thr = back_thr
+    assert match_thr > back_thr, "Threshold for `match` should be greater than `background`"
+    # Calculate IOU between given targets & anchors
+    iou_vals = box_iou(targets, anchors)
 
-    def __call__(self, iou_vals: Tensor) -> Tensor:
-        """
-        Args:
-            iou_vals(Tensor):  A MxN Tensor containing the IOU vals between M ground_truths & N predicted elements.
-        """
-        # Grab the best ground_truth overlap
-        vals, idxs = iou_vals.max(dim=0)
+    # Grab the best ground_truth overlap
+    vals, idxs = iou_vals.max(dim=0)
 
-        # Assign candidate matches with low quality to negative (unassigned) values
-        # Threshold less than `back_thr` gets assigned -1 : background
-        idxs[vals < self.back_thr] = torch.tensor(BACKGROUND_IDX)
-        # Threshold between `match_thr` & `back_thr` gets assigned -2: ignore
-        idxs[(vals >= self.back_thr) & (
-            vals < self.match_thr)] = torch.tensor(IGNORE_IDX)
-        return idxs
+    # Assign candidate matches with low quality to negative (unassigned) values
+    # Threshold less than `back_thr` gets assigned -1 : background
+    idxs[vals < back_thr] = torch.tensor(BACKGROUND_IDX)
+
+    # Threshold between `match_thr` & `back_thr` gets assigned -2: ignore
+    idxs[(vals >= back_thr) & (
+        vals < match_thr)] = torch.tensor(IGNORE_IDX)
+    return idxs
 
 
 def focal_loss(
@@ -191,7 +177,7 @@ def focal_loss(
                     positive vs negative examples or -1 for ignore. Default = 0.25
         gamma: Exponent of the modulating factor (1 - p_t) to
                 balance easy vs hard examples.
-        reduction: 'none' | 'mean' | 'sum'
+        reduction:  'none' | 'mean' | 'sum'
                     'none': No reduction will be applied to the output.
                     'mean': The output will be averaged.
                     'sum': The output will be summed.
@@ -214,3 +200,89 @@ def focal_loss(
         loss = loss.sum()
 
     return loss
+
+
+def retinanet_loss(targets: List[Dict[str, Tensor]], outputs: Dict[str, Tensor], anchors: List[Tensor]):
+    """
+    Loss for the `classification subnet` & `regression subnet` of `Retinanet`
+    """
+    bbox_coder = EncoderDecoder()
+
+    # Instantiate the List of Idxs
+    matched_idxs = []
+
+    # Iterate over all `anchors` and `targets`
+    for ancs, targs in zip(anchors, targets):
+        # match `anchors` with `targets`
+        matched_idxs.append(matcher(targs['boxes'], ancs))
+
+    # matched_idxs will contain the values `cls_id`, -1 & -2 for
+    # foreground_cls(valid_classes), background_cls & cls_to_be_ignored
+
+    # Outputs is the output of the `RetinanetHead` which is a dictionary
+    # Grab the cls_logits from the outputs and bbox_reressions from the Ouputs
+    cls_logits = outputs['logits']
+    bbox_regression = outputs['bboxes']
+
+    # Instantiate Loss
+    classification_loss = torch.tensor(0.0)
+    bbox_regress_loss = torch.tensor(0.0)
+
+    ######################################################################
+    ################### Calculate Classification Loss  ###################
+    ######################################################################
+    # Interate over targets, cls_logits & the matched_idxs
+    for cls_tgt, cls_pred, matches in zip(targets, cls_logits, matched_idxs):
+        # Extract the idxs of the foreground classes
+        class_mask = matches >= 0
+        num_foregrounds = class_mask.sum()
+
+        # Create the classification targets
+        # one_hot encode the classification targets
+        gt_class_target = torch.zeros_like(cls_pred)
+        gt_class_target = [
+            class_mask,  # Grab the idx where foreground is predicted
+            # at each predicted class put the value to be 1
+            cls_tgt['label'][matches[class_mask]]
+        ] = torch.tensor(1.0)
+
+        # Find Indices where anchors should be ignored
+        valid_idxs_per_image = matches != IGNORE_IDX
+        valid_cls_logits = cls_pred[valid_idxs_per_image]
+        valid_gt_class_target = gt_class_target[valid_idxs_per_image]
+
+        # Compute Focal Loss
+        classification_loss += focal_loss(valid_cls_logits,
+                                          valid_gt_class_target,
+                                          reduction='sum') / max(1, num_foregrounds)
+
+    ######################################################################
+    ##################### Calculate Regression Loss  #####################
+    ######################################################################
+    # Iterate over targets, bbox_reression, anchors, matched_idxs
+    for bbox_tgt, bbox_pred, ancs, matches in zip(targets, bbox_regression, anchors, matched_idxs):
+
+        # get the targets corresponding GT for each proposal
+        matched_gt_boxes_per_image = bbox_tgt['boxes'][matches.clamp(min=0)]
+
+        # determine only the foreground indices, ignore the rest
+        bbox_mask = matches >= 0
+        num_foreground = bbox_mask.sum()
+
+        # select only the foreground boxes
+        matched_gt_boxes_per_image = matched_gt_boxes_per_image[bbox_mask, :]
+        bbox_pred = bbox_pred[bbox_mask, :]
+        ancs = ancs[bbox_mask, :]
+
+        # Encode the `gt_bboxes` to `activations`
+        target_regression = bbox_coder.encode(matched_gt_boxes_per_image, ancs)
+
+        # compute the loss
+        bbox_regress_loss += smooth_l1_loss(bbox_pred,
+                                            target_regression,
+                                            reduction="sum") / max(1, num_foreground)
+
+        loss_dict = {"classification_loss": classification_loss / max(1, len(targets)),
+                     "bbox_regression_loss": bbox_regress_loss / max(1, len(targets))}
+
+        return loss_dict
