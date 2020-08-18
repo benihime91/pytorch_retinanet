@@ -1,9 +1,7 @@
 import math
 from typing import *
 
-import numpy as np
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 from torch.functional import Tensor
 from torchvision.ops.boxes import box_iou

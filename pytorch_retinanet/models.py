@@ -9,8 +9,8 @@ from torchvision.ops.boxes import box_iou, nms, remove_small_boxes
 
 from .anchors import AnchorGenerator
 from .backbone import get_backbone
-from .modelling_utils import FPN, BoxSubnet, ClassSubnet, RetinaNetHead
-from .utils import EncoderDecoder, smooth_l1_loss
+from .modelling_utils import FPN, RetinaNetHead
+from .utils import EncoderDecoder
 
 __small__ = ['resnet18', 'resnet34']
 __big__ = ['resnet50', 'resnet101', 'resnet101', 'resnet152']
