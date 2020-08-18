@@ -44,16 +44,13 @@ def bbox_2_activ(ground_truth_boxes: Tensor, anchors: Tensor) -> Tensor:
 
 
 def activ_2_bbox(activations: Tensor, anchors: Tensor, clip_activ: float = math.log(1000. / 16)) -> Tensor:
-    """Converts the `activations` of the `model` to bounding boxes."""
-
-    print("Activations shape : ", activations.shape)
-    print("Anchors Shape: ", anchors.shape)
+    "Converts the `activations` of the `model` to bounding boxes."
 
     if anchors.device != activations.device:
         anchors = anchors.to(activations.device)
 
-    w     = anchors[:, 2] - anchors[:, 0]
-    h     = anchors[:, 3] - anchors[:, 1]
+    w = anchors[:, 2] - anchors[:, 0]
+    h = anchors[:, 3] - anchors[:, 1]
     ctr_x = anchors[:, 0] + 0.5 * w
     ctr_y = anchors[:, 1] + 0.5 * h
 
@@ -179,7 +176,7 @@ def focal_loss(
 
 def retinanet_loss(targets: List[Dict[str, Tensor]], outputs: Dict[str, Tensor], anchors: List[Tensor]):
     """
-    Loss for the `classification subnet` & `regression subnet` of `Retinanet`
+    Loss for the `classification subnet` & `regression subnet` of `RetinaNet`
     """
     # Instantiate the List of Idxs
     matched_idxs = []
