@@ -8,8 +8,7 @@ from torch.functional import Tensor
 from torchvision.ops.boxes import box_iou, nms, remove_small_boxes
 
 from .anchors import AnchorGenerator
-from .backbone import get_backbone
-from .modelling_utils import FPN, RetinaNetHead
+from .layers import FPN, RetinaNetHead, get_backbone
 from .utils import EncoderDecoder
 
 __small__ = ['resnet18', 'resnet34']
