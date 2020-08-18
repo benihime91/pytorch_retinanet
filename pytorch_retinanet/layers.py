@@ -49,7 +49,7 @@ class BackBone(nn.Module):
         self.backbone.layer3.register_forward_hook(hook_fn)
         self.backbone.layer4.register_forward_hook(hook_fn)
 
-    def forward(self, xb):
+    def forward(self, xb: Tensor) -> List[Tensor]:
         _ = self.backbone(xb)
         out = [inter_outs[self.backbone.layer2],
                inter_outs[self.backbone.layer3], inter_outs[self.backbone.layer4]]
@@ -90,17 +90,21 @@ class FPN(nn.Module):
         self.conv_c3_1x1 = nn.Conv2d(C_3_size, out_channels, 1, 1, padding=0)
         self.conv_c3_3x3 = nn.Conv2d(
             out_channels, out_channels, 3, 1, padding=1)
+
         # `conv layers` to calculate `p4`
         self.conv_c4_1x1 = nn.Conv2d(C_4_size, out_channels, 1, 1, padding=0)
         self.conv_c4_3x3 = nn.Conv2d(
             out_channels, out_channels, 3, 1, padding=1)
+
         # `conv layers` to calculate `p5`
         self.conv_c5_1x1 = nn.Conv2d(C_5_size, out_channels, 1, 1, padding=0)
         self.conv_c5_3x3 = nn.Conv2d(
             out_channels, out_channels, 3, 1, padding=1)
+
         # `conv layers` to calculate `p6`
         self.conv_c6_3x3 = nn.Conv2d(
             C_5_size, out_channels, 3, stride=2, padding=1)
+
         # `conv layers` to calculate `p7`
         self.conv_c7_3x3 = nn.Conv2d(
             out_channels, out_channels, 3, stride=2, padding=1)
@@ -115,7 +119,7 @@ class FPN(nn.Module):
         # `1x1 stride stide 1 convs` on `C3`, `C4`, `C5`
         p3_output = self.conv_c3_1x1(C3)
         p4_output = self.conv_c4_1x1(C4)
-        p5_output = self.conv_c4_1x1(C5)
+        p5_output = self.conv_c5_1x1(C5)
 
         # Upsample & add ouputs[element-wise]: (p4 and p5) & (p3 and p4)
         p4_output = p4_output + self.upsample_2x(p5_output)
@@ -155,18 +159,20 @@ class BoxSubnet(nn.Module):
     def __init__(self, in_channels: int, out_channels: int = 256, num_anchors: int = 9) -> None:
         super(BoxSubnet, self).__init__()
         # Successive conv_layers
-        self.box_subnet(
-            nn.Conv2d(in_channels, out_channels,  3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, 3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, 3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, 3, padding=1),
-            nn.ReLU(inplace=True),
-        )
+        self.box_subnet = (
+            nn.Sequential(
+                nn.Conv2d(in_channels,  out_channels, 3, padding=1, stride=1),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(out_channels, out_channels, 3, padding=1, stride=1),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(out_channels, out_channels, 3, padding=1, stride=1),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(out_channels, out_channels, 3, padding=1, stride=1),
+                nn.ReLU(inplace=True),
+            ))
 
-        self.output = nn.Conv2d(out_channels, num_anchors * 4, 3, padding=1)
+        self.output = nn.Conv2d(
+            out_channels, num_anchors * 4, 3, padding=1, stride=1)
         # out shape: [batch_size, (num_anchors * 4), height, width]
 
         torch.nn.init.normal_(self.output.weight, std=0.01)
@@ -184,7 +190,7 @@ class BoxSubnet(nn.Module):
 
         for features in xb:
             x = self.box_subnet(features)
-            x = self.output(features)
+            x = self.output(x)
             # Reshape output from :
             # (batch_size, 4 * num_anchors, H, W) -> (batch_size, H*W*num_anchors, 4).
             N, _, H, W = x.shape
@@ -193,7 +199,7 @@ class BoxSubnet(nn.Module):
             x = x.reshape(N, -1, 4)  # Size=(N, HWA, 4)
             outputs.append(x)
 
-        return outputs
+        return torch.cat(outputs, dim=1)
 
 
 class ClassSubnet(nn.Module):
@@ -227,16 +233,17 @@ class ClassSubnet(nn.Module):
         self.num_classes = num_classes
         self.num_anchors = num_anchors
 
-        self.class_subnet = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels,  3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, 3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, 3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, 3, padding=1),
-            nn.ReLU(inplace=True)
-        )
+        self.class_subnet = (
+            nn.Sequential(
+                nn.Conv2d(in_channels, out_channels,  3, padding=1),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(out_channels, out_channels, 3, padding=1),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(out_channels, out_channels, 3, padding=1),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(out_channels, out_channels, 3, padding=1),
+                nn.ReLU(inplace=True)
+            ))
 
         self.output = nn.Conv2d(
             out_channels, (num_anchors * num_classes), 3, padding=1)
@@ -251,9 +258,10 @@ class ClassSubnet(nn.Module):
 
     def forward(self, xb: List[Tensor]) -> Tensor:
         outputs = []
+
         for feature in xb:
             x = self.class_subnet(feature)
-            x = F.sigmoid(self.output(feature))
+            x = F.sigmoid(self.output(x))
             # Permute classification output from :
             # (batch_size, num_anchors * num_classes, H, W) to (batch_size, H * W * num_anchors, num_classes).
             N, _, H, W = x.shape
@@ -284,7 +292,7 @@ class RetinaNetHead(nn.Module):
                  out_channels: int = 256,
                  num_anchors: int = 9,
                  prior: float = 0.01) -> None:
-        super().__init__()
+        super(RetinaNetHead, self).__init__()
         self.classification_head = ClassSubnet(
             in_channels, num_classes, num_anchors, prior, out_channels)
         self.regression_head = BoxSubnet(

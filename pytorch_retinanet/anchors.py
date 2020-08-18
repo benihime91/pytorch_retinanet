@@ -87,7 +87,9 @@ class AnchorGenerator(nn.Module):
         # In total there are A=9 anchors at each feature map for each pixel
         sizes = ifnone(sizes, [[x, x * 2**(1/3), x * 2**(2/3)]
                                for x in [32, 64, 128, 256, 512]])
+
         strides = ifnone(strides, [8, 16, 32, 64, 128])
+
         aspect_ratios = ifnone(aspect_ratios, [0.5, 1.0, 2.0])
 
         self.strides = strides
@@ -109,8 +111,8 @@ class AnchorGenerator(nn.Module):
 
     def _calculate_anchors(self, sizes, aspect_ratios) -> List[Tensor]:
         # Generate anchors of `size` (for size in sizes) of `ratio` (for ratio in aspect_ratios)
-        cell_anchors = [self.generate_cell_anchors(
-            s, a).float() for s, a in zip(sizes, aspect_ratios)]
+        cell_anchors = ([self.generate_cell_anchors(s, a)
+                         .float() for s, a in zip(sizes, aspect_ratios)])
         return BufferList(cell_anchors)
 
     @staticmethod
@@ -186,8 +188,10 @@ class AnchorGenerator(nn.Module):
                 (shifts.view(-1, 1, 4) + base_anchors.view(1, -1, 4)).reshape(-1, 4))
         return anchors
 
-    def forward(self, features: List[torch.Tensor]) -> List[Tensor]:
+    def forward(self, features: List[Tensor]) -> List[Tensor]:
         """
+        Generate `Anchors` for each `Feature Map`.
+
         Args:
           1. features (list[Tensor]): list of backbone feature maps on which to generate anchors.
 

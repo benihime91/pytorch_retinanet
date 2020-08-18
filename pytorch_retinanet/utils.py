@@ -46,13 +46,16 @@ def bbox_2_activ(ground_truth_boxes: Tensor, anchors: Tensor) -> Tensor:
 def activ_2_bbox(activations: Tensor, anchors: Tensor, clip_activ: float = math.log(1000. / 16)) -> Tensor:
     """Converts the `activations` of the `model` to bounding boxes."""
 
+    print("Activations shape : ", activations.shape)
+    print("Anchors Shape: ", anchors.shape)
+
     if anchors.device != activations.device:
         anchors = anchors.to(activations.device)
 
     w = anchors[:, 2] - anchors[:, 0]
     h = anchors[:, 3] - anchors[:, 1]
-    x = anchors[:, 0] + 0.5 * w
-    y = anchors[:, 1] + 0.5 * h
+    ctr_x = anchors[:, 0] + 0.5 * w
+    ctr_y = anchors[:, 1] + 0.5 * h
 
     dx = activations[:, 0::4]
     dy = activations[:, 1::4]
@@ -63,8 +66,8 @@ def activ_2_bbox(activations: Tensor, anchors: Tensor, clip_activ: float = math.
     dh = torch.clamp(dh, max=clip_activ)
 
     # Extrapolate bounding boxes on anchors from the model activations.
-    pred_ctr_x = x[:, None] + dx * w[:, None]
-    pred_ctr_y = y[:, None] + dy * h[:, None]
+    pred_ctr_x = dx * w[:, None] + ctr_x[:, None]
+    pred_ctr_y = dy * h[:, None] + ctr_y[:, None]
     pred_w = torch.exp(dw) * w[:, None]
     pred_h = torch.exp(dh) * h[:, None]
 
@@ -87,32 +90,6 @@ def activ_2_bbox(activations: Tensor, anchors: Tensor, clip_activ: float = math.
         (pred_boxes1, pred_boxes2, pred_boxes3, pred_boxes4), dim=2).flatten(1)
 
     return pred_boxes
-
-
-class EncoderDecoder:
-    def encode(self, gt_bboxes: List[Tensor], anchors: List[Tensor]) -> List[Tensor]:
-        "Return the target of the model on `anchors` for the `gt_bboxes`."
-        boxes_per_image = [len(b) for b in gt_bboxes]
-        # Create Tensor from Given Lists
-        gt_bboxes = torch.cat(gt_bboxes, dim=0)
-        anchors = torch.cat(anchors, dim=0)
-        # computs targets of the model
-        targets = bbox_2_activ(gt_bboxes, anchors)
-        # convert to List
-        targets = targets.split(boxes_per_image, 0)
-        return targets
-
-    def decode(self, activations: Tensor, anchors: List[Tensor]) -> Tensor:
-        anchors_per_image = [a.size(0) for a in anchors]
-        anchors = torch.cat(anchors, dim=0)
-
-        dims = 0
-        # Calculate Total size of anchors
-        for dim in anchors_per_image:
-            dims += dim
-
-        pred_boxes = activ_2_bbox(activations.reshape(dims, -1), anchors)
-        return pred_boxes.reshape(dims, -1, 4)
 
 
 def smooth_l1_loss(inp: Tensor, targs: Tensor, reduction: str = 'mean'):
@@ -204,15 +181,13 @@ def retinanet_loss(targets: List[Dict[str, Tensor]], outputs: Dict[str, Tensor],
     """
     Loss for the `classification subnet` & `regression subnet` of `Retinanet`
     """
-    bbox_coder = EncoderDecoder()
-
     # Instantiate the List of Idxs
     matched_idxs = []
 
     # Iterate over all `anchors` and `targets`
     for ancs, targs in zip(anchors, targets):
         # match `anchors` with `targets`
-        matched_idxs.append(matcher(targs['boxes'], ancs))
+        matched_idxs.append(bbox_2_activ(targs['boxes'], ancs))
 
     # matched_idxs will contain the values `cls_id`, -1 & -2 for
     # foreground_cls(valid_classes), background_cls & cls_to_be_ignored
@@ -273,7 +248,7 @@ def retinanet_loss(targets: List[Dict[str, Tensor]], outputs: Dict[str, Tensor],
         ancs = ancs[bbox_mask, :]
 
         # Encode the `gt_bboxes` to `activations`
-        target_regression = bbox_coder.encode(matched_gt_boxes_per_image, ancs)
+        target_regression = bbox_2_activ(matched_gt_boxes_per_image, ancs)
 
         # compute the loss
         bbox_regress_loss += smooth_l1_loss(bbox_pred,
