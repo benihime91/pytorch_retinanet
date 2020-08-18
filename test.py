@@ -1,4 +1,3 @@
-from pytorch_retinanet.anchors import AnchorGenerator
 from pytorch_retinanet.models import Retinanet
 import warnings
 import torch
