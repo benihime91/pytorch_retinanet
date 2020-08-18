@@ -4,9 +4,8 @@ import math
 from typing import *
 
 import torch
-from torch import device, nn
+from torch import nn
 from torch.functional import Tensor
-
 
 from . import config as cfg
 
@@ -88,7 +87,6 @@ class AnchorGenerator(nn.Module):
         # at each pyramid level we use anchors at three aspect ratios {1:2; 1:1, 2:1}
         # at each anchor level we add anchors of sizes {2**0, 2**(1/3), 2**(2/3)} of the original set of 3 anchors
         # In total there are A=9 anchors at each feature map for each pixel
-        
 
         self.strides = strides
         self.num_features = len(strides)
