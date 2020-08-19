@@ -1,4 +1,3 @@
-from pytorch_retinanet.config import MAX_IMAGE_SIZE
 from typing import *
 
 import torch
@@ -6,7 +5,6 @@ import torch.nn as nn
 from torch.functional import Tensor
 from torchvision.models.detection.transform import GeneralizedRCNNTransform
 from torchvision.ops.boxes import clip_boxes_to_image, nms, remove_small_boxes
-
 
 from . import config as cfg
 from .anchors import AnchorGenerator, ifnone
