@@ -1,9 +1,8 @@
-from typing import Dict
+from typing import *
+
 import cv2
 import pandas as pd
 import torch
-from torch import nn
-from torch.functional import Tensor
 from torch.utils.data import DataLoader, Dataset
 
 from . import config as cfg
@@ -29,7 +28,7 @@ class CSVDataset(Dataset):
     def __len__(self):
         return self.image_ids.shape[0]
 
-    def __getitem(self, idx):
+    def __getitem__(self, idx):
         # Grab the image, bbox & labels from the DataFrame
         image_id = self.image_ids[idx]
         im = cv2.cvtColor(cv2.imread(image_id), cv2.COLOR_BGR2RGB)
@@ -39,10 +38,12 @@ class CSVDataset(Dataset):
 
         boxes = (
             records[
-                [cfg.XMIN_HEADER,
-                 cfg.YMIN_HEADER,
-                 cfg.YMIN_HEADER,
-                 cfg.YMAX_HEADER]
+                [
+                    cfg.XMIN_HEADER,
+                    cfg.YMIN_HEADER,
+                    cfg.YMIN_HEADER,
+                    cfg.YMAX_HEADER
+                ]
             ].values)
 
         # claculate bbox area
@@ -76,3 +77,23 @@ class CSVDataset(Dataset):
         target['iscrowd'] = iscrowd
 
         return image.float(), target
+
+
+def collate_fn(batch):
+    return tuple(zip(*batch))
+
+
+def get_dataloader(trn: bool = False) -> DataLoader:
+    "Returns a pyTorch `DataLoader Instance`"
+    loader = (
+        DataLoader(
+            dataset=CSVDataset(trn),
+            batch_size=cfg.BATCH_SIZE,
+            shuffle=cfg.SHUFFLE,
+            collate_fn=collate_fn,
+            num_workers=cfg.NUM_WORKERS,
+            pin_memory=cfg.PIN_MEMORY,
+            drop_last=cfg.DROP_LAST
+        ))
+
+    return loader

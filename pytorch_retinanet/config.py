@@ -1,4 +1,5 @@
 from typing import *
+
 import albumentations as A
 from albumentations.pytorch import ToTensorV2 as ToTensor
 
@@ -21,6 +22,10 @@ MAX_IMAGE_SIZE: int = 1333
 # Csv File Options. Each Item in the csv should `correspond` to a single annotation.
 # `targets` should be `Integers`.
 # `Maximum` size of the image to be rescaled before feeding it to the backbone
+
+# -----------------------------------------------------------------------------
+# `Dataset` & `DataLoader` Options
+# -----------------------------------------------------------------------------
 
 # Path(s) to the csv `file`.
 TRAIN_CSV_DIR: str = 'data.csv'
@@ -72,15 +77,29 @@ TRAIN_TRANSFORMATIONS = TRAIN_TRANSFORMATIONS + VALID_TRANSFORMATIONS
 
 TRANSFORMATIONS: Dict[str, A.Compose] = {
     'train_transforms': (
-        A.Compose(TRAIN_TRANSFORMATIONS,
-                  p=1.0,
-                  bbox_params=A.BboxParams(format='pascal_voc', label_fields=['class_labels']))),
+        A.Compose(
+            TRAIN_TRANSFORMATIONS,
+            p=1.0,
+            bbox_params=A.BboxParams(
+                format='pascal_voc',
+                label_fields=['class_labels']
+            ))),
     'valid_transforms': (
-        A.Compose(VALID_TRANSFORMATIONS,
-                  p=1.0,
-                  bbox_params=A.BboxParams(format='pascal_voc', label_fields=['class_labels']))),
+        A.Compose(
+            VALID_TRANSFORMATIONS,
+            p=1.0,
+            bbox_params=A.BboxParams(
+                format='pascal_voc',
+                label_fields=['class_labels']
+            ))),
 }
 
+# Options for a `PyTorch` `DataLoader` instance
+SHUFFLE: bool = True
+BATCH_SIZE: bool = 8
+PIN_MEMORY: bool = True
+NUM_WORKERS: int = 0
+DROP_LAST: bool = False
 
 
 # -----------------------------------------------------------------------------
@@ -109,7 +128,6 @@ BACKGROUND_IDX: Any[int] = -1
 # Anchors  with >= bg and < fg are ignored (-2)
 BBOX_REG_WEIGHTS: List[float] = [1.0, 1.0, 1.0, 1.0]
 # Weights on (dx, dy, dw, dh) for normalizing Retinanet anchor regression targets
-
 
 
 # -----------------------------------------------------------------------------
