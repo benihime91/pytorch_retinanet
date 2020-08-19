@@ -1,3 +1,4 @@
+from pytorch_retinanet.config import MAX_IMAGE_SIZE
 from typing import *
 
 import torch
@@ -21,6 +22,46 @@ __big__ = ['resnet50', 'resnet101', 'resnet101', 'resnet152']
 class Retinanet(nn.Module):
     """
     Implement RetinaNet in :paper:`RetinaNet`.
+
+    The input to the model is expected to be a list of tensors, each of shape [C, H, W], one for each
+    image, and should be in 0-1 range. Different images can have different sizes.
+
+    The behavior of the model changes depending if it is in training or evaluation mode.
+
+    During training, the model expects both the input tensors, as well as a targets (list of dictionary),
+    containing:
+        - boxes (FloatTensor[N, 4]): the ground-truth boxes in [x1, y1, x2, y2] format, with values of x
+          between 0 and W and values of y between 0 and H
+        - labels (Int64Tensor[N]): the class label for each ground-truth box
+
+    The model returns a Dict[Tensor] during training, containing the `classification` and `regression` losses for 
+    the `RetinaNet` `classSubnet` & `BoxSubnet` repectively.
+
+    During inference, the model requires only the input tensors, and returns the post-processed
+    predictions as a List[Dict[Tensor]], one for each input image. The fields of the Dict are as
+    follows:
+        - boxes (FloatTensor[N, 4]): the predicted boxes in [x1, y1, x2, y2] format, with values of x
+          between 0 and W and values of y between 0 and H
+        - labels (Int64Tensor[N]): the predicted labels for each image
+        - scores (Tensor[N]): the scores or each prediction
+
+    Arguments:
+        - num_classes   (int): number of output classes of the model (excluding the background).
+        - backbone_kind (str): the network used to compute the features for the model. Currently support only `Resnet` networks.
+        - prior       (float): Prior prob for rare case (i.e. foreground) at the beginning of training.
+        - pretrianed   (bool): Wether the backbone should be `pretrained` or not.
+        - nms_thres   (float): Overlap threshold used for non-maximum suppression (suppress boxes with IoU >= this threshold)
+        - score_thres (float): Minimum score threshold (assuming scores in a [0, 1] range.
+        - max_detections_per_images(int): Number of proposals to keep after applying NMS.
+        - freeze_bn   (bool): Wether to freeze the `BatchNorm` layers of the `BackBone` network.
+        - anchor_generator(AnchorGenertor): Must be an instance of `AnchorGenerator`. If None the default AnchorGenerator is used.
+                                            see `config.py`
+        - min_size (int)    : `minimum size` of the image to be rescaled before feeding it to the backbone.
+        - max_size (int)    : `maximum size` of the image to be rescaled before feeding it to the backbone.
+        - image_mean (List[float]): mean values used for input normalization.
+        - image_std (List[float]): std values used for input normalization.
+
+    >>> For default values see `config.py`
     """
 
     def __init__(self,
@@ -32,7 +73,12 @@ class Retinanet(nn.Module):
                  score_thres: float = cfg.SCORE_THRES,
                  max_detections_per_images: int = cfg.MAX_DETECTIONS_PER_IMAGE,
                  freeze_bn: bool = cfg.FREEZE_BN,
-                 anchor_generator: Callable = None) -> None:
+                 anchor_generator: Callable = None,
+                 min_size: int = cfg.MIN_IMAGE_SIZE,
+                 max_size: int = cfg.MAX_IMAGE_SIZE,
+                 image_mean: List[float] = cfg.MEAN,
+                 image_std: List[float] = cfg.STD,
+                 ) -> None:
 
         # The reason for the 0.05 is because that is what appears to be used by other systems as well,
         # such as faster rcnn and Detectron.
@@ -45,10 +91,10 @@ class Retinanet(nn.Module):
         # Transoforms Input Images
         self.pre_tfms = (
             GeneralizedRCNNTransform(
-                cfg.MIN_IMAGE_SIZE,
-                cfg.MAX_IMAGE_SIZE,
-                cfg.MEAN,
-                cfg.STD))
+                min_size,
+                max_size,
+                image_mean,
+                image_std))
 
         # Get the back bone of the Model
         self.backbone = (
@@ -167,8 +213,8 @@ class Retinanet(nn.Module):
             # Update Detection Dictionary
             detections.append({
                 'boxes':  torch.cat(all_boxes, dim=0),
-                'scores': torch.cat(all_scores, dim=0),
                 'labels': torch.cat(all_labels, dim=0),
+                'scores': torch.cat(all_scores, dim=0),
             })
 
         return detections
