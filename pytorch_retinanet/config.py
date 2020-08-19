@@ -18,15 +18,14 @@ STD: List[float] = [0.229, 0.224, 0.225]
 MIN_IMAGE_SIZE: int = 600
 # `Minimum size` of the image to be rescaled before feeding it to the backbone
 MAX_IMAGE_SIZE: int = 1333
-
-# Csv File Options. Each Item in the csv should `correspond` to a single annotation.
-# `targets` should be `Integers`.
 # `Maximum` size of the image to be rescaled before feeding it to the backbone
+
 
 # -----------------------------------------------------------------------------
 # `Dataset` & `DataLoader` Options
 # -----------------------------------------------------------------------------
-
+# Csv File Options. Each Item in the csv should `correspond` to a single annotation.
+# `targets` should be `Integers`.
 # Path(s) to the csv `file` or the `csv` files.
 TRAIN_CSV_DIR: str = None
 VALID_CSV_DIR: str = None
