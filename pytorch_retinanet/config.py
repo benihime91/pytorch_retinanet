@@ -1,4 +1,6 @@
 from typing import *
+import albumentations as A
+from albumentations.pytorch import ToTensorV2 as ToTensor
 
 # -----------------------------------------------------------------------------
 # Config definition
@@ -6,7 +8,7 @@ from typing import *
 
 
 # -----------------------------------------------------------------------------
-# INPUT
+# Input Options
 # -----------------------------------------------------------------------------
 MEAN: List[float] = [0.485, 0.456, 0.406]
 # `Mean values` used for input normalization.
@@ -15,7 +17,70 @@ STD: List[float] = [0.229, 0.224, 0.225]
 MIN_IMAGE_SIZE: int = 600
 # `Minimum size` of the image to be rescaled before feeding it to the backbone
 MAX_IMAGE_SIZE: int = 1333
+
+# Csv File Options. Each Item in the csv should `correspond` to a single annotation.
+# `targets` should be `Integers`.
 # `Maximum` size of the image to be rescaled before feeding it to the backbone
+
+# Path(s) to the csv `file`.
+TRAIN_CSV_DIR: str = 'data.csv'
+VALID_CSV_DIR: str = None
+
+# csv header pointing to the `image_paths`.
+IMG_HEADER: str = 'filepath'
+
+# csv header pointing to the `xmin` of `annotations`.
+XMIN_HEADER: str = 'xmin'
+# csv header pointing to the `ymin` of `annotations`.
+YMIN_HEADER: str = 'ymin'
+# csv header pointing to the `xmax` of `annotations`.
+XMAX_HEADER: str = 'xmax'
+# csv header pointing to the `ymax` of `annotations`.
+YMAX_HEADER: str = 'ymax'
+# csv header pointing to the `classes` of the `bboxes`.
+CLASS_HEADER: str = 'targets'
+
+# Albumentations transformations to apply to the `Images` & `bboxes`
+# check : https://albumentations.ai/docs/getting_started/transforms_and_targets/
+# to see which transformations are valid for bbox augmentations.
+
+# Valid Transformations
+VALID_TRANSFORMATIONS: List = [
+    A.ToFloat(max_value=255., always_apply=True),
+    ToTensor(always_apply=True)
+]
+
+
+# Train Transformations
+TRAIN_TRANSFORMATIONS: List = [
+    A.CLAHE(),
+    A.RandomBrightness(),
+    A.HueSaturationValue(),
+    A.OneOf([
+        A.RandomRain(),
+        A.RandomFog(),
+        A.RandomSunFlare(),
+        A.RandomBrightnessContrast(),
+        A.GaussianBlur()
+    ]),
+    A.IAASharpen(),
+    A.HorizontalFlip(),
+    A.Cutout(),
+    A.ToGray(p=0.25)
+]
+TRAIN_TRANSFORMATIONS = TRAIN_TRANSFORMATIONS + VALID_TRANSFORMATIONS
+
+TRANSFORMATIONS: Dict[str, A.Compose] = {
+    'train_transforms': (
+        A.Compose(TRAIN_TRANSFORMATIONS,
+                  p=1.0,
+                  bbox_params=A.BboxParams(format='pascal_voc', label_fields=['class_labels']))),
+    'valid_transforms': (
+        A.Compose(VALID_TRANSFORMATIONS,
+                  p=1.0,
+                  bbox_params=A.BboxParams(format='pascal_voc', label_fields=['class_labels']))),
+}
+
 
 
 # -----------------------------------------------------------------------------
@@ -44,6 +109,7 @@ BACKGROUND_IDX: Any[int] = -1
 # Anchors  with >= bg and < fg are ignored (-2)
 BBOX_REG_WEIGHTS: List[float] = [1.0, 1.0, 1.0, 1.0]
 # Weights on (dx, dy, dw, dh) for normalizing Retinanet anchor regression targets
+
 
 
 # -----------------------------------------------------------------------------

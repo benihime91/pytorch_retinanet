@@ -10,3 +10,5 @@ if __name__ == "__main__":
     print(model)
     outputs = model(z)
     print(f" --> OUTPUTS:\n{outputs}")
+
+

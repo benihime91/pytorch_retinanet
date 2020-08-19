@@ -224,7 +224,7 @@ def retinanet_loss(
         gt_class_target = [
             class_mask,  # Grab the idx where foreground is predicted
             # at each predicted class put the value to be 1
-            cls_tgt['label'][matches[class_mask]]
+            cls_tgt['labels'][matches[class_mask]]
         ] = torch.tensor(1.0)
 
         # Find Indices where anchors should be ignored
