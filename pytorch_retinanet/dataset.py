@@ -92,7 +92,7 @@ class CSVDataset(Dataset):
         area = torch.as_tensor(area, dtype=torch.float32)
 
         # Grab the class Labels
-        class_labels = records[self.cls_header].values
+        class_labels = records[self.cls_header].values.tolist()
 
         iscrowd = torch.zeros((records.shape[0],), dtype=torch.int64)
 

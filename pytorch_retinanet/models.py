@@ -178,8 +178,7 @@ class Retinanet(nn.Module):
                 inds = torch.gt(pred_cls[:, cls_idx], self.score_thres)
                 # Filter out the cls_idx
                 pred_box_per_cls, pred_cls_per_cls, pred_lbl_per_cls = \
-                    pred_box[inds], pred_cls[inds,
-                                             cls_idx], pred_lbl[inds, cls_idx]
+                    pred_box[inds], pred_cls[inds, cls_idx], pred_lbl[inds, cls_idx]
 
                 ######################################################################
                 ########## Compute Detections for Single Class : cls_idx #############

@@ -19,4 +19,4 @@ A simple implementations of `Retinanet` for `object detection` as described in t
 - [ ] Check `Training`.
 - [ ] Inference for `single image` and `batches`.
 - [ ] Scripts for `training` & `inference`.
-- [ ] Evaluation using `COCO API`. (?????)
+- [x] Evaluation using `COCO API`. (scripts taken from: https://github.com/PyTorchLightning/wheat )
