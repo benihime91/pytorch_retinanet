@@ -27,8 +27,8 @@ MAX_IMAGE_SIZE: int = 1333
 # `Dataset` & `DataLoader` Options
 # -----------------------------------------------------------------------------
 
-# Path(s) to the csv `file`.
-TRAIN_CSV_DIR: str = 'data.csv'
+# Path(s) to the csv `file` or the `csv` files.
+TRAIN_CSV_DIR: str = None
 VALID_CSV_DIR: str = None
 
 # csv header pointing to the `image_paths`.

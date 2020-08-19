@@ -27,7 +27,7 @@ class CSVDataset(Dataset):
     - tfms (Dict[str, Compose])    : `Albumentations` transforms to be applied to Image before feeding into the network.
                                       should be a dictionary where `train_transforms` & `val_transforms` should be the 
                                       transformations for the `training` or `validation data` respectively.
-    - filepath (str)               :  `CSV` header for the Image File Paths.              
+    - filepath (str)               :  `CSV` header for the Image File Paths.        
     - xmin_header (str)            :  `CSV` header for the xmin values for the `annotations`.
     - ymin_header (str)            :  `CSV` header for the xmin values for the `annotations`.
     - xmax_header (str)            :  `CSV` header for the xmin values for the `annotations`.
@@ -124,26 +124,28 @@ def collate_fn(batch):
     return tuple(zip(*batch))
 
 
-def get_dataloader(dataset: Dataset = None, trn: Optional[bool] = False, **kwargs) -> DataLoader:
+def get_dataloader(
+        dataset: Dataset = None,
+        trn: Optional[bool] = False,
+        batch_size: int = cfg.BATCH_SIZE,
+        shuffle: bool = cfg.SHUFFLE,
+        pin_memory: bool = cfg.PIN_MEMORY,
+        num_workers: int = cfg.NUM_WORKERS,
+        drop_last: bool = cfg.DROP_LAST,
+        ** kwargs) -> DataLoader:
     '''
-    Returns a PyTorch `DataLoader Instance`
-    1. dataset (Dataset)      : A torch.utils.data.Dataset Instance if None then `CSV` dataset is used.
-    2. trn     Optional[bool] : `trn` argument for `CSVDataset`
-
-    **kwargs arguments for the `DataLoader`
-    if not given then default arguments in `config.py` are used.
+    Returns a PyTorch `DataLoader Instance`.
     '''
     dataset = ifnone(dataset, CSVDataset(trn))
     loader = (
         DataLoader(
             dataset=dataset,
-            batch_size=cfg.BATCH_SIZE,
-            shuffle=cfg.SHUFFLE,
             collate_fn=collate_fn,
-            num_workers=cfg.NUM_WORKERS,
-            pin_memory=cfg.PIN_MEMORY,
-            drop_last=cfg.DROP_LAST,
-            **kwargs
-        ))
+            batch_size=batch_size,
+            shuffle=shuffle,
+            pin_memory=pin_memory,
+            num_workers=num_workers,
+            drop_last=drop_last,
+            **kwargs))
 
     return loader
