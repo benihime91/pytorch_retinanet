@@ -1,12 +1,5 @@
-# ----------------------------------------------------------------------------------------------------------------------
-# From :
-# https://github.com/PyTorchLightning/wheat/blob/dee605b0bf5cf6b0ab08755c45e38dc07d338bb7/src/utils/coco_transforms.py
-# ----------------------------------------------------------------------------------------------------------------------
-
 import copy
 import json
-import tempfile
-import time
 from collections import defaultdict
 
 import numpy as np
@@ -299,8 +292,6 @@ def loadRes(self, resFile):
             ann['area'] = (x2 - x1) * (y2 - y1)
             ann['id'] = id + 1
             ann['bbox'] = [x1, y1, x2 - x1, y2 - y1]
-    # print('DONE (t={:0.2f}s)'.format(time.time()- tic))
-
     res.dataset['annotations'] = anns
     createIndex(res)
     return res
@@ -311,14 +302,11 @@ def evaluate(self):
     Run per image evaluation on given images and store results (a list of dict) in self.evalImgs
     :return: None
     '''
-    # tic = time.time()
-    # print('Running per image evaluation...')
     p = self.params
     # add backward compatibility if useSegm is specified in params
     if p.useSegm is not None:
         p.iouType = 'segm' if p.useSegm == 1 else 'bbox'
         print('useSegm (deprecated) is not None. Running {} evaluation'.format(p.iouType))
-    # print('Evaluate annotation type *{}*'.format(p.iouType))
     p.imgIds = list(np.unique(p.imgIds))
     if p.useCats:
         p.catIds = list(np.unique(p.catIds))
@@ -350,8 +338,6 @@ def evaluate(self):
     evalImgs = np.asarray(evalImgs).reshape(
         len(catIds), len(p.areaRng), len(p.imgIds))
     self._paramsEval = copy.deepcopy(self.params)
-    # toc = time.time()
-    # print('DONE (t={:0.2f}s).'.format(toc-tic))
     return p.imgIds, evalImgs
 
 #################################################################
