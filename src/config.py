@@ -31,18 +31,18 @@ TRAIN_CSV_DIR: str = None
 VALID_CSV_DIR: str = None
 
 # csv header pointing to the `image_paths`.
-IMG_HEADER: str = 'filepath'
+IMG_HEADER: str = "filepath"
 
 # csv header pointing to the `xmin` of `annotations`.
-XMIN_HEADER: str = 'xmin'
+XMIN_HEADER: str = "xmin"
 # csv header pointing to the `ymin` of `annotations`.
-YMIN_HEADER: str = 'ymin'
+YMIN_HEADER: str = "ymin"
 # csv header pointing to the `xmax` of `annotations`.
-XMAX_HEADER: str = 'xmax'
+XMAX_HEADER: str = "xmax"
 # csv header pointing to the `ymax` of `annotations`.
-YMAX_HEADER: str = 'ymax'
+YMAX_HEADER: str = "ymax"
 # csv header pointing to the `classes` of the `bboxes`.
-CLASS_HEADER: str = 'targets'
+CLASS_HEADER: str = "targets"
 
 # Albumentations transformations to apply to the `Images` & `bboxes`
 # check : https://albumentations.ai/docs/getting_started/transforms_and_targets/
@@ -50,8 +50,8 @@ CLASS_HEADER: str = 'targets'
 
 # Valid Transformations
 VALID_TRANSFORMATIONS: List = [
-    A.ToFloat(max_value=255., always_apply=True),
-    ToTensor(always_apply=True)
+    A.ToFloat(max_value=255.0, always_apply=True),
+    ToTensor(always_apply=True),
 ]
 
 
@@ -60,37 +60,41 @@ TRAIN_TRANSFORMATIONS: List = [
     A.CLAHE(),
     A.RandomBrightness(),
     A.HueSaturationValue(),
-    A.OneOf([
-        A.RandomRain(),
-        A.RandomFog(),
-        A.RandomSunFlare(),
-        A.RandomBrightnessContrast(),
-        A.GaussianBlur()
-    ]),
+    A.OneOf(
+        [
+            A.RandomRain(),
+            A.RandomFog(),
+            A.RandomSunFlare(),
+            A.RandomBrightnessContrast(),
+            A.GaussianBlur(),
+        ]
+    ),
     A.IAASharpen(),
     A.HorizontalFlip(),
     A.Cutout(),
-    A.ToGray(p=0.25)
+    A.ToGray(p=0.25),
 ]
 TRAIN_TRANSFORMATIONS = TRAIN_TRANSFORMATIONS + VALID_TRANSFORMATIONS
 
 TRANSFORMATIONS: Dict[str, A.Compose] = {
-    'train_transforms': (
+    "train_transforms": (
         A.Compose(
             TRAIN_TRANSFORMATIONS,
             p=1.0,
             bbox_params=A.BboxParams(
-                format='pascal_voc',
-                label_fields=['class_labels']
-            ))),
-    'valid_transforms': (
+                format="pascal_voc", label_fields=["class_labels"]
+            ),
+        )
+    ),
+    "valid_transforms": (
         A.Compose(
             VALID_TRANSFORMATIONS,
             p=1.0,
             bbox_params=A.BboxParams(
-                format='pascal_voc',
-                label_fields=['class_labels']
-            ))),
+                format="pascal_voc", label_fields=["class_labels"]
+            ),
+        )
+    ),
 }
 
 # Options for a `PyTorch` `DataLoader` instance
@@ -105,13 +109,13 @@ DROP_LAST: bool = False
 # Anchor Generator Options
 # -----------------------------------------------------------------------------
 ANCHOR_SIZES: List[float] = [
-    [x, x * 2**(1/3), x * 2**(2/3)] for x in [32, 64, 128, 256, 512]
+    [x, x * 2 ** (1 / 3), x * 2 ** (2 / 3)] for x in [32, 64, 128, 256, 512]
 ]
 # Anchor sizes (i.e. sqrt of area) in absolute pixels w.r.t. the network input.
 ANCHOR_STRIDES: List[int] = [8, 16, 32, 64, 128]
 # A list of float value representing the strides for each feature
 # map in the feature pyramid.
-ANCHOR_OFFSET: float = 0.
+ANCHOR_OFFSET: float = 0.0
 # Relative offset between the center of the first anchor and the top-left corner of the image
 # Value has to be in [0, 1). Recommend to use 0.5, which means half stride.
 # The value is not expected to affect model accuracy.
@@ -138,7 +142,7 @@ NUM_CLASSES: int = 80
 
 # The network used to compute the features for the model.
 # Should be one of ['resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet101', 'resnet152'].
-BACKBONE: str = 'resnet50'
+BACKBONE: str = "resnet50"
 
 # Prior prob for rare case (i.e. foreground) at the beginning of training.
 # This is used to set the bias for the logits layer of the classifier subnet.

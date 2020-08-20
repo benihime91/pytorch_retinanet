@@ -12,14 +12,14 @@ from torch.functional import Tensor
 from . import config as cfg
 from .utils import retinanet_loss
 
-__all__ = ['resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152']
+__all__ = ["resnet18", "resnet34", "resnet50", "resnet101", "resnet152"]
 
 funcs = {
-    'resnet18': torchvision.models.resnet18,
-    'resnet34': torchvision.models.resnet34,
-    'resnet50': torchvision.models.resnet50,
-    'resnet101': torchvision.models.resnet101,
-    'resnet152': torchvision.models.resnet152,
+    "resnet18": torchvision.models.resnet18,
+    "resnet34": torchvision.models.resnet34,
+    "resnet50": torchvision.models.resnet50,
+    "resnet101": torchvision.models.resnet101,
+    "resnet152": torchvision.models.resnet152,
 }
 
 
@@ -38,11 +38,13 @@ inter_outs = {}
 
 
 class BackBone(nn.Module):
-    def __init__(self,
-                 kind: str = 'resnet18',
-                 hook_fn: Callable = None,
-                 pretrained: bool = True,
-                 freeze_bn: bool = True) -> None:
+    def __init__(
+        self,
+        kind: str = "resnet18",
+        hook_fn: Callable = None,
+        pretrained: bool = True,
+        freeze_bn: bool = True,
+    ) -> None:
         """Create a Backbone from `kind`"""
         super(BackBone, self).__init__()
         build_fn = funcs[kind]
@@ -66,14 +68,14 @@ class BackBone(nn.Module):
         out = [
             inter_outs[self.backbone.layer2],
             inter_outs[self.backbone.layer3],
-            inter_outs[self.backbone.layer4]
+            inter_outs[self.backbone.layer4],
         ]
         return out
 
 
-def get_backbone(kind: str = 'resnet18',
-                 pretrained: bool = True,
-                 freeze_bn: bool = True) -> nn.Module:
+def get_backbone(
+    kind: str = "resnet18", pretrained: bool = True, freeze_bn: bool = True
+) -> nn.Module:
     """
     Returns a `ResNet` Backbone.
 
@@ -90,10 +92,9 @@ def get_backbone(kind: str = 'resnet18',
         # Function to Hook Intermediate Outputs
         inter_outs[self] = out
 
-    backbone = BackBone(kind=kind,
-                        hook_fn=hook_outputs,
-                        pretrained=pretrained,
-                        freeze_bn=freeze_bn)
+    backbone = BackBone(
+        kind=kind, hook_fn=hook_outputs, pretrained=pretrained, freeze_bn=freeze_bn
+    )
 
     return backbone
 
@@ -108,30 +109,25 @@ class FPN(nn.Module):
         super(FPN, self).__init__()
         # `conv layers` to calculate `p3`
         self.conv_c3_1x1 = nn.Conv2d(C_3_size, out_channels, 1, 1, padding=0)
-        self.conv_c3_3x3 = nn.Conv2d(
-            out_channels, out_channels, 3, 1, padding=1)
+        self.conv_c3_3x3 = nn.Conv2d(out_channels, out_channels, 3, 1, padding=1)
 
         # `conv layers` to calculate `p4`
         self.conv_c4_1x1 = nn.Conv2d(C_4_size, out_channels, 1, 1, padding=0)
-        self.conv_c4_3x3 = nn.Conv2d(
-            out_channels, out_channels, 3, 1, padding=1)
+        self.conv_c4_3x3 = nn.Conv2d(out_channels, out_channels, 3, 1, padding=1)
 
         # `conv layers` to calculate `p5`
         self.conv_c5_1x1 = nn.Conv2d(C_5_size, out_channels, 1, 1, padding=0)
-        self.conv_c5_3x3 = nn.Conv2d(
-            out_channels, out_channels, 3, 1, padding=1)
+        self.conv_c5_3x3 = nn.Conv2d(out_channels, out_channels, 3, 1, padding=1)
 
         # `conv layers` to calculate `p6`
-        self.conv_c6_3x3 = nn.Conv2d(
-            C_5_size, out_channels, 3, stride=2, padding=1)
+        self.conv_c6_3x3 = nn.Conv2d(C_5_size, out_channels, 3, stride=2, padding=1)
 
         # `conv layers` to calculate `p7`
-        self.conv_c7_3x3 = nn.Conv2d(
-            out_channels, out_channels, 3, stride=2, padding=1)
+        self.conv_c7_3x3 = nn.Conv2d(out_channels, out_channels, 3, stride=2, padding=1)
 
         # `upsample layer` to increase `output_size` for `elementwise-additions`
         # with previous pyramid level
-        self.upsample_2x = nn.Upsample(scale_factor=2, mode='nearest')
+        self.upsample_2x = nn.Upsample(scale_factor=2, mode="nearest")
 
     def forward(self, inps: List[Tensor]):
         C3, C4, C5 = inps
@@ -178,23 +174,23 @@ class BoxSubnet(nn.Module):
         per spatial location.
     """
 
-    def __init__(self, in_channels: int, out_channels: int = 256, num_anchors: int = 9) -> None:
+    def __init__(
+        self, in_channels: int, out_channels: int = 256, num_anchors: int = 9
+    ) -> None:
         super(BoxSubnet, self).__init__()
         # Successive conv_layers
-        self.box_subnet = (
-            nn.Sequential(
-                nn.Conv2d(in_channels,  out_channels, 3, padding=1, stride=1),
-                nn.ReLU(inplace=True),
-                nn.Conv2d(out_channels, out_channels, 3, padding=1, stride=1),
-                nn.ReLU(inplace=True),
-                nn.Conv2d(out_channels, out_channels, 3, padding=1, stride=1),
-                nn.ReLU(inplace=True),
-                nn.Conv2d(out_channels, out_channels, 3, padding=1, stride=1),
-                nn.ReLU(inplace=True),
-            ))
+        self.box_subnet = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, 3, padding=1, stride=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels, 3, padding=1, stride=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels, 3, padding=1, stride=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels, 3, padding=1, stride=1),
+            nn.ReLU(inplace=True),
+        )
 
-        self.output = nn.Conv2d(
-            out_channels, num_anchors * 4, 3, padding=1, stride=1)
+        self.output = nn.Conv2d(out_channels, num_anchors * 4, 3, padding=1, stride=1)
         # out shape: [batch_size, (num_anchors * 4), height, width]
 
         torch.nn.init.normal_(self.output.weight, std=0.01)
@@ -246,31 +242,31 @@ class ClassSubnet(nn.Module):
         where each item correspond to the binary predictions per spatial location.
     """
 
-    def __init__(self,
-                 in_channels: int,
-                 num_classes: int,
-                 num_anchors: int = 9,
-                 prior: float = cfg.PRIOR,
-                 out_channels: int = 256) -> None:
+    def __init__(
+        self,
+        in_channels: int,
+        num_classes: int,
+        num_anchors: int = 9,
+        prior: float = cfg.PRIOR,
+        out_channels: int = 256,
+    ) -> None:
 
         super(ClassSubnet, self).__init__()
         self.num_classes = num_classes
         self.num_anchors = num_anchors
 
-        self.class_subnet = (
-            nn.Sequential(
-                nn.Conv2d(in_channels, out_channels,  3, padding=1),
-                nn.ReLU(inplace=True),
-                nn.Conv2d(out_channels, out_channels, 3, padding=1),
-                nn.ReLU(inplace=True),
-                nn.Conv2d(out_channels, out_channels, 3, padding=1),
-                nn.ReLU(inplace=True),
-                nn.Conv2d(out_channels, out_channels, 3, padding=1),
-                nn.ReLU(inplace=True)
-            ))
+        self.class_subnet = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, 3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels, 3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels, 3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels, 3, padding=1),
+            nn.ReLU(inplace=True),
+        )
 
-        self.output = nn.Conv2d(
-            out_channels, (num_anchors * num_classes), 3, padding=1)
+        self.output = nn.Conv2d(out_channels, (num_anchors * num_classes), 3, padding=1)
 
         for layer in self.class_subnet.children():
             if isinstance(layer, nn.Conv2d):
@@ -278,7 +274,7 @@ class ClassSubnet(nn.Module):
                 torch.nn.init.constant_(layer.bias, 0)
 
         torch.nn.init.normal_(self.output.weight, std=0.01)
-        torch.nn.init.constant_(self.output.bias, -math.log((1-prior)/prior))
+        torch.nn.init.constant_(self.output.bias, -math.log((1 - prior) / prior))
 
     def forward(self, xb: List[Tensor]) -> Tensor:
         outputs = []
@@ -312,39 +308,37 @@ class RetinaNetHead(nn.Module):
                             start of training.
     """
 
-    def __init__(self,
-                 in_channels: int,
-                 num_classes: int,
-                 out_channels: int = 256,
-                 num_anchors: int = 9,
-                 prior: float = cfg.PRIOR) -> None:
+    def __init__(
+        self,
+        in_channels: int,
+        num_classes: int,
+        out_channels: int = 256,
+        num_anchors: int = 9,
+        prior: float = cfg.PRIOR,
+    ) -> None:
 
         super(RetinaNetHead, self).__init__()
 
         # Initialize `ClassSubnet`
-        self.classification_head = (
-            ClassSubnet(in_channels,
-                        num_classes,
-                        num_anchors,
-                        prior,
-                        out_channels))
+        self.classification_head = ClassSubnet(
+            in_channels, num_classes, num_anchors, prior, out_channels
+        )
 
         # Initialize `BoxSubnet`
-        self.regression_head = (
-            BoxSubnet(in_channels,
-                      out_channels,
-                      num_anchors))
+        self.regression_head = BoxSubnet(in_channels, out_channels, num_anchors)
 
     def forward(self, xb: List[Tensor]) -> Dict[str, Tensor]:
         cls_logits = self.classification_head(xb)
         bbox_regressions = self.regression_head(xb)
 
-        return {'logits': cls_logits, 'bboxes': bbox_regressions}
+        return {"logits": cls_logits, "bboxes": bbox_regressions}
 
-    def retinanet_focal_loss(self,
-                             targets: List[Dict[str, Tensor]],
-                             ouptuts: Dict[str, Tensor],
-                             anchors: List[Tensor]):
+    def retinanet_focal_loss(
+        self,
+        targets: List[Dict[str, Tensor]],
+        ouptuts: Dict[str, Tensor],
+        anchors: List[Tensor],
+    ):
 
         loss = retinanet_loss(targets, ouptuts, anchors)
         return loss

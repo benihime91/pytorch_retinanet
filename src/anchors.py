@@ -11,7 +11,7 @@ from . import config as cfg
 
 
 def ifnone(a: Any, b: Any) -> Any:
-    '''`a` if `a` is not None, otherwise `b`'''
+    """`a` if `a` is not None, otherwise `b`"""
     if a is not None:
         return a
     else:
@@ -75,12 +75,14 @@ class AnchorGenerator(nn.Module):
         device : torch.device
     """
 
-    def __init__(self,
-                 sizes: List[float] = cfg.ANCHOR_SIZES,
-                 aspect_ratios: List[float] = cfg.ANCHOR_ASPECT_RATIOS,
-                 strides: List[int] = cfg.ANCHOR_STRIDES,
-                 offset: float = cfg.ANCHOR_OFFSET,
-                 device: torch.device = torch.device('cpu')) -> None:
+    def __init__(
+        self,
+        sizes: List[float] = cfg.ANCHOR_SIZES,
+        aspect_ratios: List[float] = cfg.ANCHOR_ASPECT_RATIOS,
+        strides: List[int] = cfg.ANCHOR_STRIDES,
+        offset: float = cfg.ANCHOR_OFFSET,
+        device: torch.device = torch.device("cpu"),
+    ) -> None:
 
         super().__init__()
         # Anchors have areas of 32**2 to 512**2 on pyramid levels P3 to P7
@@ -91,12 +93,12 @@ class AnchorGenerator(nn.Module):
         self.strides = strides
         self.num_features = len(strides)
 
-        self.sizes = _broadcast_params(sizes, self.num_features, 'sizes')
+        self.sizes = _broadcast_params(sizes, self.num_features, "sizes")
         self.aspect_ratios = _broadcast_params(
-            aspect_ratios, self.num_features, 'aspect_ratios')
+            aspect_ratios, self.num_features, "aspect_ratios"
+        )
 
-        self.cell_anchors = self._calculate_anchors(
-            self.sizes, self.aspect_ratios)
+        self.cell_anchors = self._calculate_anchors(self.sizes, self.aspect_ratios)
 
         self.offset = offset
         self._device = device
@@ -107,19 +109,25 @@ class AnchorGenerator(nn.Module):
 
     def _calculate_anchors(self, sizes, aspect_ratios) -> List[Tensor]:
         # Generate anchors of `size` (for size in sizes) of `ratio` (for ratio in aspect_ratios)
-        cell_anchors = ([self.generate_cell_anchors(s, a)
-                         .float() for s, a in zip(sizes, aspect_ratios)])
+        cell_anchors = [
+            self.generate_cell_anchors(s, a).float()
+            for s, a in zip(sizes, aspect_ratios)
+        ]
         return BufferList(cell_anchors)
 
     @staticmethod
-    def _compute_grid_offsets(size: List[int], stride: int, offset: float, device: torch.device):
+    def _compute_grid_offsets(
+        size: List[int], stride: int, offset: float, device: torch.device
+    ):
         """Compute grid offsets of `size` with `stride`"""
         H, W = size
 
         shifts_x = torch.arange(
-            offset * stride, W * stride, step=stride, dtype=torch.float32, device=device)
+            offset * stride, W * stride, step=stride, dtype=torch.float32, device=device
+        )
         shifts_y = torch.arange(
-            offset * stride, H * stride, step=stride, dtype=torch.float32, device=device)
+            offset * stride, H * stride, step=stride, dtype=torch.float32, device=device
+        )
 
         shifts_y, shifts_x = torch.meshgrid(shifts_y, shifts_x)
 
@@ -171,17 +179,18 @@ class AnchorGenerator(nn.Module):
         Returns : list[Tensor] : #feature_map tensors, each is (#locations x #cell_anchors) x 4
         """
         anchors = []
-        buffers: List[torch.Tensor] = [x[1]
-                                       for x in self.cell_anchors.named_buffers()]
+        buffers: List[torch.Tensor] = [x[1] for x in self.cell_anchors.named_buffers()]
 
         for size, stride, base_anchors in zip(grid_sizes, self.strides, buffers):
             # Compute grid offsets from `size` and `stride`
             shift_x, shift_y = self._compute_grid_offsets(
-                size, stride, self.offset, device=self.device)
+                size, stride, self.offset, device=self.device
+            )
             shifts = torch.stack((shift_x, shift_y, shift_x, shift_y), dim=1)
             # shift base anchors to get the set of anchors for a full feature map
             anchors.append(
-                (shifts.view(-1, 1, 4) + base_anchors.view(1, -1, 4)).reshape(-1, 4))
+                (shifts.view(-1, 1, 4) + base_anchors.view(1, -1, 4)).reshape(-1, 4)
+            )
         return anchors
 
     def forward(self, features: List[Tensor]) -> List[Tensor]:

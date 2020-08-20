@@ -11,8 +11,8 @@ from .anchors import AnchorGenerator, ifnone
 from .layers import FPN, RetinaNetHead, get_backbone
 from .utils import activ_2_bbox
 
-__small__ = ['resnet18', 'resnet34']
-__big__ = ['resnet50', 'resnet101', 'resnet101', 'resnet152']
+__small__ = ["resnet18", "resnet34"]
+__big__ = ["resnet50", "resnet101", "resnet101", "resnet152"]
 
 # TODO : Make changes to make compatible with `torchvision` coco_evaluate script
 
@@ -62,44 +62,39 @@ class Retinanet(nn.Module):
     >>> For default values see `config.py`
     """
 
-    def __init__(self,
-                 num_classes: int = cfg.NUM_CLASSES,
-                 backbone_kind: str = cfg.BACKBONE,
-                 prior: float = cfg.PRIOR,
-                 pretrained: bool = cfg.PRETRAINED_BACKBONE,
-                 nms_thres: float = cfg.NMS_THRES,
-                 score_thres: float = cfg.SCORE_THRES,
-                 max_detections_per_images: int = cfg.MAX_DETECTIONS_PER_IMAGE,
-                 freeze_bn: bool = cfg.FREEZE_BN,
-                 anchor_generator: Callable = None,
-                 min_size: int = cfg.MIN_IMAGE_SIZE,
-                 max_size: int = cfg.MAX_IMAGE_SIZE,
-                 image_mean: List[float] = cfg.MEAN,
-                 image_std: List[float] = cfg.STD,
-                 ) -> None:
+    def __init__(
+        self,
+        num_classes: int = cfg.NUM_CLASSES,
+        backbone_kind: str = cfg.BACKBONE,
+        prior: float = cfg.PRIOR,
+        pretrained: bool = cfg.PRETRAINED_BACKBONE,
+        nms_thres: float = cfg.NMS_THRES,
+        score_thres: float = cfg.SCORE_THRES,
+        max_detections_per_images: int = cfg.MAX_DETECTIONS_PER_IMAGE,
+        freeze_bn: bool = cfg.FREEZE_BN,
+        anchor_generator: Callable = None,
+        min_size: int = cfg.MIN_IMAGE_SIZE,
+        max_size: int = cfg.MAX_IMAGE_SIZE,
+        image_mean: List[float] = cfg.MEAN,
+        image_std: List[float] = cfg.STD,
+    ) -> None:
 
         # The reason for the 0.05 is because that is what appears to be used by other systems as well,
         # such as faster rcnn and Detectron.
 
         super(Retinanet, self).__init__()
-        assert backbone_kind in __small__ + \
-            __big__, f" Expected `backbone_kind` to be one of {__small__+__big__} got {backbone_kind}"
+        assert (
+            backbone_kind in __small__ + __big__
+        ), f" Expected `backbone_kind` to be one of {__small__+__big__} got {backbone_kind}"
 
         # Instantiate `GeneralizedRCNNTransform to Resize Images`
         # Transoforms Input Images
-        self.pre_tfms = (
-            GeneralizedRCNNTransform(
-                min_size,
-                max_size,
-                image_mean,
-                image_std))
+        self.pre_tfms = GeneralizedRCNNTransform(
+            min_size, max_size, image_mean, image_std
+        )
 
         # Get the back bone of the Model
-        self.backbone = (
-            get_backbone(
-                backbone_kind,
-                pretrained,
-                freeze_bn=freeze_bn))
+        self.backbone = get_backbone(backbone_kind, pretrained, freeze_bn=freeze_bn)
 
         # Grab the backbone output channels
         if backbone_kind in __small__:
@@ -116,8 +111,9 @@ class Retinanet(nn.Module):
             ]
 
         # Instantiate the `FPN`
-        self.fpn = FPN(self.fpn_szs[0], self.fpn_szs[1],
-                       self.fpn_szs[2], out_channels=256)
+        self.fpn = FPN(
+            self.fpn_szs[0], self.fpn_szs[1], self.fpn_szs[2], out_channels=256
+        )
 
         # Instantiate anchor Generator
         self.anchor_generator = ifnone(anchor_generator, AnchorGenerator())
@@ -125,7 +121,8 @@ class Retinanet(nn.Module):
 
         # Instantiate `RetinaNetHead`
         self.retinanet_head = RetinaNetHead(
-            256, num_classes, 256, self.num_anchors, prior)
+            256, num_classes, 256, self.num_anchors, prior
+        )
 
         # Parameters
         self.score_thres = score_thres
@@ -133,21 +130,22 @@ class Retinanet(nn.Module):
         self.detections_per_images = max_detections_per_images
 
     def compute_retinanet_loss(self, targets, outputs, anchors):
-        loss = self.retinanet_head.retinanet_focal_loss(
-            targets, outputs, anchors)
+        loss = self.retinanet_head.retinanet_focal_loss(targets, outputs, anchors)
         return loss
 
-    def process_detections(self,
-                           outputs: Dict[str, Tensor],
-                           anchors: List[Tensor],
-                           image_shapes: List[Tuple[int, int]]) -> Dict[str, Tensor]:
+    def process_detections(
+        self,
+        outputs: Dict[str, Tensor],
+        anchors: List[Tensor],
+        image_shapes: List[Tuple[int, int]],
+    ) -> Dict[str, Tensor]:
 
         # # Modified From :
         # https: // github.com/pytorch/vision/blob/master/torchvision/models/detection/roi_heads.py
 
         # shape: (None, H*W*num_anchors, num_classes)
-        pred_classes = outputs.pop('logits')
-        pred_boxes = outputs.pop('bboxes')  # shape: (None, H*W*num_anchors, 4)
+        pred_classes = outputs.pop("logits")
+        pred_boxes = outputs.pop("bboxes")  # shape: (None, H*W*num_anchors, 4)
 
         device = pred_classes.device
         num_classes = pred_classes.shape[-1]
@@ -159,8 +157,9 @@ class Retinanet(nn.Module):
 
         detections = []
 
-        for pred_box, pred_cls, pred_lbl, anc, sz in \
-                zip(pred_boxes, pred_classes, pred_labels, anchors, image_shapes):
+        for pred_box, pred_cls, pred_lbl, anc, sz in zip(
+            pred_boxes, pred_classes, pred_labels, anchors, image_shapes
+        ):
 
             # Transfrom the `retinanet_activations` into `bboxes`
             pred_box = activ_2_bbox(pred_box, anc)
@@ -177,30 +176,35 @@ class Retinanet(nn.Module):
                 # Filter Detections using Score_threshold: Remove Low Scoring Boxes
                 inds = torch.gt(pred_cls[:, cls_idx], self.score_thres)
                 # Filter out the cls_idx
-                pred_box_per_cls, pred_cls_per_cls, pred_lbl_per_cls = \
-                    pred_box[inds], pred_cls[inds, cls_idx], pred_lbl[inds, cls_idx]
+                pred_box_per_cls, pred_cls_per_cls, pred_lbl_per_cls = (
+                    pred_box[inds],
+                    pred_cls[inds, cls_idx],
+                    pred_lbl[inds, cls_idx],
+                )
 
                 ######################################################################
                 ########## Compute Detections for Single Class : cls_idx #############
                 ######################################################################
                 # 1. Filter empty boxes
-                keep_mask = remove_small_boxes(
-                    pred_box_per_cls, min_size=1e-02)
-                pred_box_per_cls, pred_cls_per_cls, pred_lbl_per_cls = \
-                    pred_box_per_cls[keep_mask], pred_cls_per_cls[keep_mask], pred_lbl_per_cls[keep_mask]
+                keep_mask = remove_small_boxes(pred_box_per_cls, min_size=1e-02)
+                pred_box_per_cls, pred_cls_per_cls, pred_lbl_per_cls = (
+                    pred_box_per_cls[keep_mask],
+                    pred_cls_per_cls[keep_mask],
+                    pred_lbl_per_cls[keep_mask],
+                )
 
                 # 2. Do NMS
-                keep_mask = nms(
-                    pred_box_per_cls,
-                    pred_cls_per_cls,
-                    self.nms_thres)
+                keep_mask = nms(pred_box_per_cls, pred_cls_per_cls, self.nms_thres)
 
                 # 3. Keep top classes upto `detections_per_images`
-                keep_mask = keep_mask[:self.detections_per_images]
+                keep_mask = keep_mask[: self.detections_per_images]
 
                 # 4. Gather predictions
-                pred_box_per_cls, pred_cls_per_cls, pred_lbl_per_cls = \
-                    pred_box_per_cls[keep_mask], pred_cls_per_cls[keep_mask], pred_lbl_per_cls[keep_mask]
+                pred_box_per_cls, pred_cls_per_cls, pred_lbl_per_cls = (
+                    pred_box_per_cls[keep_mask],
+                    pred_cls_per_cls[keep_mask],
+                    pred_lbl_per_cls[keep_mask],
+                )
 
                 # Update `ouputs` list
                 all_boxes.append(pred_box_per_cls)
@@ -208,11 +212,13 @@ class Retinanet(nn.Module):
                 all_labels.append(pred_lbl_per_cls)
 
             # Update Detection Dictionary
-            detections.append({
-                'boxes':  torch.cat(all_boxes, dim=0),
-                'labels': torch.cat(all_labels, dim=0),
-                'scores': torch.cat(all_scores, dim=0),
-            })
+            detections.append(
+                {
+                    "boxes": torch.cat(all_boxes, dim=0),
+                    "labels": torch.cat(all_labels, dim=0),
+                    "scores": torch.cat(all_scores, dim=0),
+                }
+            )
 
         return detections
 
@@ -220,7 +226,9 @@ class Retinanet(nn.Module):
         "returns `detections` if model is `eval` else returns `loss`"
 
         if self.training:
-            assert targets is not None, "If model is `training`, `targets` must be given."
+            assert (
+                targets is not None
+            ), "If model is `training`, `targets` must be given."
 
         # Grab the original Image sizes
         original_image_sizes = []
@@ -247,8 +255,7 @@ class Retinanet(nn.Module):
 
         if self.training:
             # Compute Losses
-            losses = self.compute_retinanet_loss(
-                targets, head_outputs, anchors)
+            losses = self.compute_retinanet_loss(targets, head_outputs, anchors)
 
             return losses
 
@@ -256,9 +263,11 @@ class Retinanet(nn.Module):
             with torch.no_grad():
                 # Compute Detections
                 detections = self.process_detections(
-                    head_outputs, anchors, images.image_sizes)
+                    head_outputs, anchors, images.image_sizes
+                )
 
                 detections = self.pre_tfms.postprocess(
-                    detections, images.image_sizes, original_image_sizes)
+                    detections, images.image_sizes, original_image_sizes
+                )
 
             return detections

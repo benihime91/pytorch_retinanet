@@ -36,8 +36,8 @@ def bbox_2_activ(ground_truth_boxes: Tensor, anchors: Tensor) -> Tensor:
     gt_y = ground_truths_y1 + 0.5 * gt_h
 
     # Calculate Offsets
-    dx = cfg.BBOX_REG_WEIGHTS[0] * (gt_x-x) / w
-    dy = cfg.BBOX_REG_WEIGHTS[1] * (gt_y-y) / h
+    dx = cfg.BBOX_REG_WEIGHTS[0] * (gt_x - x) / w
+    dy = cfg.BBOX_REG_WEIGHTS[1] * (gt_y - y) / h
     dw = cfg.BBOX_REG_WEIGHTS[2] * torch.log(gt_w / w)
     dh = cfg.BBOX_REG_WEIGHTS[3] * torch.log(gt_h / h)
 
@@ -46,9 +46,8 @@ def bbox_2_activ(ground_truth_boxes: Tensor, anchors: Tensor) -> Tensor:
 
 
 def activ_2_bbox(
-        activations: Tensor,
-        anchors: Tensor,
-        clip_activ: float = math.log(1000. / 16)) -> Tensor:
+    activations: Tensor, anchors: Tensor, clip_activ: float = math.log(1000.0 / 16)
+) -> Tensor:
     "Converts the `activations` of the `model` to bounding boxes."
 
     if anchors.device != activations.device:
@@ -74,27 +73,32 @@ def activ_2_bbox(
     pred_h = torch.exp(dh) * h[:, None]
 
     # Convert bbox shape from xywh to x1y1x2y2
-    pred_boxes1 = pred_ctr_x - \
-        torch.tensor(0.5, dtype=pred_ctr_x.dtype,
-                     device=pred_w.device) * pred_w
-    pred_boxes2 = pred_ctr_y - \
-        torch.tensor(0.5, dtype=pred_ctr_y.dtype,
-                     device=pred_h.device) * pred_h
-    pred_boxes3 = pred_ctr_x + \
-        torch.tensor(0.5, dtype=pred_ctr_x.dtype,
-                     device=pred_w.device) * pred_w
-    pred_boxes4 = pred_ctr_y + \
-        torch.tensor(0.5, dtype=pred_ctr_y.dtype,
-                     device=pred_h.device) * pred_h
+    pred_boxes1 = (
+        pred_ctr_x
+        - torch.tensor(0.5, dtype=pred_ctr_x.dtype, device=pred_w.device) * pred_w
+    )
+    pred_boxes2 = (
+        pred_ctr_y
+        - torch.tensor(0.5, dtype=pred_ctr_y.dtype, device=pred_h.device) * pred_h
+    )
+    pred_boxes3 = (
+        pred_ctr_x
+        + torch.tensor(0.5, dtype=pred_ctr_x.dtype, device=pred_w.device) * pred_w
+    )
+    pred_boxes4 = (
+        pred_ctr_y
+        + torch.tensor(0.5, dtype=pred_ctr_y.dtype, device=pred_h.device) * pred_h
+    )
 
     # Stack the co-ordinates to the bbox co-ordinates.
     pred_boxes = torch.stack(
-        (pred_boxes1, pred_boxes2, pred_boxes3, pred_boxes4), dim=2).flatten(1)
+        (pred_boxes1, pred_boxes2, pred_boxes3, pred_boxes4), dim=2
+    ).flatten(1)
 
     return pred_boxes
 
 
-def smooth_l1_loss(inp: Tensor, targs: Tensor, reduction: str = 'mean'):
+def smooth_l1_loss(inp: Tensor, targs: Tensor, reduction: str = "mean"):
     """
     Computes `Smooth_L1_Loss`
     """
@@ -106,10 +110,11 @@ BACKGROUND_IDX = cfg.BACKGROUND_IDX
 
 
 def matcher(
-        targets: Tensor,
-        anchors: Tensor,
-        match_thr: float = cfg.IOU_THRESHOLDS_FOREGROUND,
-        back_thr: float = cfg.IOU_THRESHOLDS_BACKGROUND) -> Tensor:
+    targets: Tensor,
+    anchors: Tensor,
+    match_thr: float = cfg.IOU_THRESHOLDS_FOREGROUND,
+    back_thr: float = cfg.IOU_THRESHOLDS_BACKGROUND,
+) -> Tensor:
     """
     Match `anchors` to targets. -1 is match to background, -2 is ignore.
     """
@@ -121,7 +126,9 @@ def matcher(
     # The classifier's target will be the category of that target.
     # - if the maximum overlap is between 0.4 and 0.5, we ignore that anchor in our loss computation.
 
-    assert match_thr > back_thr, "Threshold for `match` should be greater than `background`"
+    assert (
+        match_thr > back_thr
+    ), "Threshold for `match` should be greater than `background`"
     # Calculate IOU between given targets & anchors
     iou_vals = box_iou(targets, anchors)
 
@@ -133,17 +140,17 @@ def matcher(
     idxs[vals < back_thr] = torch.tensor(BACKGROUND_IDX)
 
     # Threshold between `match_thr` & `back_thr` gets assigned -2: ignore
-    idxs[(vals >= back_thr) & (
-        vals < match_thr)] = torch.tensor(IGNORE_IDX)
+    idxs[(vals >= back_thr) & (vals < match_thr)] = torch.tensor(IGNORE_IDX)
     return idxs
 
 
 def focal_loss(
-        inputs: Tensor,
-        targets: Tensor,
-        alpha: float = cfg.FOCAL_LOSS_ALPHA,
-        gamma: float = cfg.FOCAL_LOSS_GAMMA,
-        reduction: str = "mean"):
+    inputs: Tensor,
+    targets: Tensor,
+    alpha: float = cfg.FOCAL_LOSS_ALPHA,
+    gamma: float = cfg.FOCAL_LOSS_GAMMA,
+    reduction: str = "mean",
+):
     """
     From: https://github.com/facebookresearch/fvcore/blob/master/fvcore/nn/focal_loss.py .
 
@@ -165,8 +172,7 @@ def focal_loss(
         Loss tensor with the reduction option applied.
     """
     p = inputs
-    ce_loss = F.binary_cross_entropy_with_logits(
-        inputs, targets, reduction="none")
+    ce_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction="none")
     p_t = p * targets + (1 - p) * (1 - targets)
     loss = ce_loss * ((1 - p_t) ** gamma)
 
@@ -183,9 +189,8 @@ def focal_loss(
 
 
 def retinanet_loss(
-        targets: List[Dict[str, Tensor]],
-        outputs: Dict[str, Tensor],
-        anchors: List[Tensor]):
+    targets: List[Dict[str, Tensor]], outputs: Dict[str, Tensor], anchors: List[Tensor]
+):
     """
     Loss for the `classification subnet` & `regression subnet` of `RetinaNet`
     """
@@ -195,15 +200,15 @@ def retinanet_loss(
     # Iterate over all `anchors` and `targets`
     for ancs, targs in zip(anchors, targets):
         # match `anchors` with `targets`
-        matched_idxs.append(bbox_2_activ(targs['boxes'], ancs))
+        matched_idxs.append(bbox_2_activ(targs["boxes"], ancs))
 
     # matched_idxs will contain the values `cls_id`, -1 & -2 for
     # foreground_cls(valid_classes), background_cls & cls_to_be_ignored
 
     # Outputs is the output of the `RetinanetHead` which is a dictionary
     # Grab the cls_logits from the outputs and bbox_reressions from the Ouputs
-    cls_logits = outputs['logits']
-    bbox_regression = outputs['bboxes']
+    cls_logits = outputs["logits"]
+    bbox_regression = outputs["bboxes"]
 
     # Instantiate Loss
     classification_loss = torch.tensor(0.0)
@@ -224,7 +229,7 @@ def retinanet_loss(
         gt_class_target = [
             class_mask,  # Grab the idx where foreground is predicted
             # at each predicted class put the value to be 1
-            cls_tgt['labels'][matches[class_mask]]
+            cls_tgt["labels"][matches[class_mask]],
         ] = torch.tensor(1.0)
 
         # Find Indices where anchors should be ignored
@@ -233,18 +238,20 @@ def retinanet_loss(
         valid_gt_class_target = gt_class_target[valid_idxs_per_image]
 
         # Compute Focal Loss
-        classification_loss += focal_loss(valid_cls_logits,
-                                          valid_gt_class_target,
-                                          reduction='sum') / max(1, num_foregrounds)
+        classification_loss += focal_loss(
+            valid_cls_logits, valid_gt_class_target, reduction="sum"
+        ) / max(1, num_foregrounds)
 
     ######################################################################
     ##################### Calculate Regression Loss  #####################
     ######################################################################
     # Iterate over targets, bbox_reression, anchors, matched_idxs
-    for bbox_tgt, bbox_pred, ancs, matches in zip(targets, bbox_regression, anchors, matched_idxs):
+    for bbox_tgt, bbox_pred, ancs, matches in zip(
+        targets, bbox_regression, anchors, matched_idxs
+    ):
 
         # get the targets corresponding GT for each proposal
-        matched_gt_boxes_per_image = bbox_tgt['boxes'][matches.clamp(min=0)]
+        matched_gt_boxes_per_image = bbox_tgt["boxes"][matches.clamp(min=0)]
 
         # determine only the foreground indices, ignore the rest
         bbox_mask = matches >= 0
@@ -259,13 +266,13 @@ def retinanet_loss(
         target_regression = bbox_2_activ(matched_gt_boxes_per_image, ancs)
 
         # compute the loss
-        bbox_regress_loss += (
-            smooth_l1_loss(
-                bbox_pred,
-                target_regression,
-                reduction="sum") / max(1, num_foreground))
+        bbox_regress_loss += smooth_l1_loss(
+            bbox_pred, target_regression, reduction="sum"
+        ) / max(1, num_foreground)
 
-        loss_dict = {"classification_loss": classification_loss / max(1, len(targets)),
-                     "bbox_regression_loss": bbox_regress_loss / max(1, len(targets))}
+        loss_dict = {
+            "classification_loss": classification_loss / max(1, len(targets)),
+            "bbox_regression_loss": bbox_regress_loss / max(1, len(targets)),
+        }
 
         return loss_dict
