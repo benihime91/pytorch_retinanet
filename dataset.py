@@ -100,6 +100,7 @@ class CSVDataset(Dataset):
         boxes = transformed["bboxes"]
         class_labels = transformed["class_labels"]
 
+        # Convert all to `Tensors`
         image_idx = torch.tensor([index])
         boxes = torch.tensor(boxes, dtype=torch.float32)
         area = torch.tensor(area, dtype=torch.float32)

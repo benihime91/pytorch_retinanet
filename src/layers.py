@@ -8,8 +8,7 @@ import torchvision
 from torch import nn as nn
 from torch.functional import Tensor
 
-
-from . import config as cfg
+from ..config import *
 from .utils import retinanet_loss
 
 __all__ = ["resnet18", "resnet34", "resnet50", "resnet101", "resnet152"]
@@ -81,7 +80,8 @@ def get_backbone(
 
     Args:
         1. kind       : (str) name of the resnet model eg: `resnet18`.
-        2. pretrained : (bool) wether to load pretrained weights.
+        2. pretrained : (bool) wether to load pretrained `imagenet` weights.
+        3. freeze_bn  : (bool) wether to freeze `BatchNorm` layers.
 
     Example:
         >>> m = get_backbone(kind='resnet18')
@@ -246,8 +246,8 @@ class ClassSubnet(nn.Module):
         self,
         in_channels: int,
         num_classes: int,
-        num_anchors: int = 9,
-        prior: float = cfg.PRIOR,
+        num_anchors: int,
+        prior: float = PRIOR,
         out_channels: int = 256,
     ) -> None:
 
@@ -314,7 +314,7 @@ class RetinaNetHead(nn.Module):
         num_classes: int,
         out_channels: int = 256,
         num_anchors: int = 9,
-        prior: float = cfg.PRIOR,
+        prior: float = PRIOR,
     ) -> None:
 
         super(RetinaNetHead, self).__init__()
@@ -333,8 +333,8 @@ class RetinaNetHead(nn.Module):
 
         return {"logits": cls_logits, "bboxes": bbox_regressions}
 
+    @staticmethod
     def retinanet_focal_loss(
-        self,
         targets: List[Dict[str, Tensor]],
         ouptuts: Dict[str, Tensor],
         anchors: List[Tensor],

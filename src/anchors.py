@@ -7,7 +7,7 @@ import torch
 from torch import nn
 from torch.functional import Tensor
 
-from . import config as cfg
+from ..config import *
 
 
 def ifnone(a: Any, b: Any) -> Any:
@@ -72,27 +72,28 @@ class AnchorGenerator(nn.Module):
         strides (List[int]): stride of each input feature.
         offset (float): Relative offset between the center of the first anchor and the top-left
                 corner of the image. Value has to be in [0, 1).
-        device : torch.device
     """
 
     def __init__(
         self,
-        sizes: List[float] = cfg.ANCHOR_SIZES,
-        aspect_ratios: List[float] = cfg.ANCHOR_ASPECT_RATIOS,
-        strides: List[int] = cfg.ANCHOR_STRIDES,
-        offset: float = cfg.ANCHOR_OFFSET,
-        device: torch.device = torch.device("cpu"),
+        sizes: List[float] = None,
+        aspect_ratios: List[float] = None,
+        strides: List[int] = None,
+        offset: float = None,
     ) -> None:
 
-        super().__init__()
+        super(AnchorGenerator, self).__init__()
         # Anchors have areas of 32**2 to 512**2 on pyramid levels P3 to P7
         # at each pyramid level we use anchors at three aspect ratios {1:2; 1:1, 2:1}
         # at each anchor level we add anchors of sizes {2**0, 2**(1/3), 2**(2/3)} of the original set of 3 anchors
         # In total there are A=9 anchors at each feature map for each pixel
+        strides = ifnone(strides, ANCHOR_STRIDES)
+        sizes = ifnone(sizes, ANCHOR_SIZES)
+        aspect_ratios = ifnone(aspect_ratios, ANCHOR_ASPECT_RATIOS)
+        offset = ifnone(offset, ANCHOR_OFFSET)
 
         self.strides = strides
         self.num_features = len(strides)
-
         self.sizes = _broadcast_params(sizes, self.num_features, "sizes")
         self.aspect_ratios = _broadcast_params(
             aspect_ratios, self.num_features, "aspect_ratios"
@@ -101,11 +102,6 @@ class AnchorGenerator(nn.Module):
         self.cell_anchors = self._calculate_anchors(self.sizes, self.aspect_ratios)
 
         self.offset = offset
-        self._device = device
-
-    @property
-    def device(self) -> torch.device:
-        return self._device
 
     def _calculate_anchors(self, sizes, aspect_ratios) -> List[Tensor]:
         # Generate anchors of `size` (for size in sizes) of `ratio` (for ratio in aspect_ratios)
@@ -116,17 +112,15 @@ class AnchorGenerator(nn.Module):
         return BufferList(cell_anchors)
 
     @staticmethod
-    def _compute_grid_offsets(
-        size: List[int], stride: int, offset: float, device: torch.device
-    ):
+    def _compute_grid_offsets(size: List[int], stride: int, offset: float):
         """Compute grid offsets of `size` with `stride`"""
         H, W = size
 
         shifts_x = torch.arange(
-            offset * stride, W * stride, step=stride, dtype=torch.float32, device=device
+            offset * stride, W * stride, step=stride, dtype=torch.float32,
         )
         shifts_y = torch.arange(
-            offset * stride, H * stride, step=stride, dtype=torch.float32, device=device
+            offset * stride, H * stride, step=stride, dtype=torch.float32,
         )
 
         shifts_y, shifts_x = torch.meshgrid(shifts_y, shifts_x)
@@ -149,7 +143,10 @@ class AnchorGenerator(nn.Module):
         """
         return [len(cell_anchors) for cell_anchors in self.cell_anchors]
 
-    def generate_cell_anchors(self, sizes, aspect_ratios) -> Tensor:
+    @staticmethod
+    def generate_cell_anchors(
+        sizes: tuple[float], aspect_ratios: tuple[float]
+    ) -> Tensor:
         """
         Generates a Tensor storing cannonical anchor boxes, where all
         anchor boxes are of different sizes & aspect ratios centered at (0,0).
@@ -165,6 +162,7 @@ class AnchorGenerator(nn.Module):
         """
         # instantiate empty anchor list to store anchors
         anchors = []
+        # Iterate over given sizes
         for size in sizes:
             area = size ** 2.0
             for aspect_ratio in aspect_ratios:
@@ -183,9 +181,7 @@ class AnchorGenerator(nn.Module):
 
         for size, stride, base_anchors in zip(grid_sizes, self.strides, buffers):
             # Compute grid offsets from `size` and `stride`
-            shift_x, shift_y = self._compute_grid_offsets(
-                size, stride, self.offset, device=self.device
-            )
+            shift_x, shift_y = self._compute_grid_offsets(size, stride, self.offset,)
             shifts = torch.stack((shift_x, shift_y, shift_x, shift_y), dim=1)
             # shift base anchors to get the set of anchors for a full feature map
             anchors.append(

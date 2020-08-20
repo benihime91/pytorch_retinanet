@@ -6,7 +6,7 @@ from torch.functional import Tensor
 from torchvision.models.detection.transform import GeneralizedRCNNTransform
 from torchvision.ops.boxes import clip_boxes_to_image, nms, remove_small_boxes
 
-from . import config as cfg
+from ..config import *
 from .anchors import AnchorGenerator, ifnone
 from .layers import FPN, RetinaNetHead, get_backbone
 from .utils import activ_2_bbox
@@ -64,20 +64,36 @@ class Retinanet(nn.Module):
 
     def __init__(
         self,
-        num_classes: int = cfg.NUM_CLASSES,
-        backbone_kind: str = cfg.BACKBONE,
-        prior: float = cfg.PRIOR,
-        pretrained: bool = cfg.PRETRAINED_BACKBONE,
-        nms_thres: float = cfg.NMS_THRES,
-        score_thres: float = cfg.SCORE_THRES,
-        max_detections_per_images: int = cfg.MAX_DETECTIONS_PER_IMAGE,
-        freeze_bn: bool = cfg.FREEZE_BN,
-        min_size: int = cfg.MIN_IMAGE_SIZE,
-        max_size: int = cfg.MAX_IMAGE_SIZE,
-        image_mean: List[float] = cfg.MEAN,
-        image_std: List[float] = cfg.STD,
+        num_classes: Optional[int] = None,
+        backbone_kind: Optional[str] = None,
+        prior: Optional[float] = None,
+        pretrained: Optional[bool] = None,
+        nms_thres: Optional[float] = None,
+        score_thres: Optional[float] = None,
+        max_detections_per_images: Optional[int] = None,
+        freeze_bn: Optional[bool] = None,
+        min_size: Optional[int] = None,
+        max_size: Optional[int] = None,
+        image_mean: List[float] = None,
+        image_std: List[float] = None,
         anchor_generator: Optional[AnchorGenerator] = None,
     ) -> None:
+
+        num_classes = ifnone(num_classes, NUM_CLASSES)
+        backbone_kind = ifnone(backbone_kind, BACKBONE)
+        prior = ifnone(prior, PRIOR)
+        pretrained = ifnone(pretrained, PRETRAINED_BACKBONE)
+        nms_thres = ifnone(nms_thres, NMS_THRES)
+        score_thres = ifnone(score_thres, SCORE_THRES)
+        max_detections_per_images = ifnone(
+            max_detections_per_images, MAX_DETECTIONS_PER_IMAGE
+        )
+        freeze_bn = ifnone(freeze_bn, FREEZE_BN)
+        min_size = ifnone(min_size, MIN_IMAGE_SIZE)
+        max_size = ifnone(max_size, MAX_IMAGE_SIZE)
+        image_mean = ifnone(image_mean, MEAN)
+        image_std = ifnone(image_std, STD)
+        anchor_generator = ifnone(anchor_generator, AnchorGenerator())
 
         # The reason for the 0.05 is because that is what appears to be used by other systems as well,
         # such as faster rcnn and Detectron.
