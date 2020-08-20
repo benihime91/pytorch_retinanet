@@ -6,7 +6,7 @@ from torch.functional import Tensor
 from torchvision.models.detection.transform import GeneralizedRCNNTransform
 from torchvision.ops.boxes import clip_boxes_to_image, nms, remove_small_boxes
 
-from ..config import *
+from src.config import *
 from .anchors import AnchorGenerator, ifnone
 from .layers import FPN, RetinaNetHead, get_backbone
 from .utils import activ_2_bbox

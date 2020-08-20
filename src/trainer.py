@@ -3,7 +3,7 @@ from typing import *
 import pytorch_lightning as pl
 import torch
 from torch import nn
-from torch.optim.optimizer import Optimizer, optimizer
+from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 
 from .eval_utils.coco_eval import CocoEvaluator

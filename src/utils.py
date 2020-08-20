@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from torch.functional import Tensor
 from torchvision.ops.boxes import box_iou
 
-from ..config import *
+from src.config import *
 from .anchors import ifnone
 
 

@@ -5,7 +5,7 @@ import pandas as pd
 import torch
 from torch.utils.data import DataLoader, Dataset
 
-import config as cfg
+from src.config import *
 from src.anchors import ifnone
 
 from .transforms import get_transformations
@@ -56,16 +56,16 @@ class CSVDataset(Dataset):
         self.is_trn = trn
 
         if self.is_trn:
-            self.csv_pth = ifnone(directory, cfg.TRAIN_CSV_DIR)
+            self.csv_pth = ifnone(directory, TRAIN_CSV_DIR)
         else:
-            self.csv_pth = ifnone(directory, cfg.VAL_CSV_DIR)
+            self.csv_pth = ifnone(directory, VAL_CSV_DIR)
 
-        self.file_header = ifnone(filepath, cfg.IMG_HEADER)
-        self.xmin_header = ifnone(xmin_header, cfg.XMIN_HEADER)
-        self.ymin_header = ifnone(ymin_header, cfg.YMIN_HEADER)
-        self.xmax_header = ifnone(xmax_header, cfg.XMAX_HEADER)
-        self.ymax_header = ifnone(ymax_header, cfg.YMAX_HEADER)
-        self.cls_header = ifnone(class_header, class_header)
+        self.file_header = ifnone(filepath, IMG_HEADER)
+        self.xmin_header = ifnone(xmin_header, XMIN_HEADER)
+        self.ymin_header = ifnone(ymin_header, YMIN_HEADER)
+        self.xmax_header = ifnone(xmax_header, XMAX_HEADER)
+        self.ymax_header = ifnone(ymax_header, YMAX_HEADER)
+        self.cls_header = ifnone(class_header, CLASS_HEADER)
         self.tfms_dict = ifnone(transformations, get_transformations())
 
         self.df = pd.read_csv(self.csv_pth)
@@ -138,10 +138,10 @@ def get_dataloader(
     dataset = ifnone(dataset, CSVDataset(trn=train))
     dataloader = DataLoader(
         dataset,
-        batch_size=cfg.BATCH_SIZE,
-        shuffle=cfg.SHUFFLE,
-        num_workers=cfg.NUM_WORKERS,
-        pin_memory=cfg.PIN_MEMORY,
-        drop_last=cfg.DROP_LAST,
+        batch_size=BATCH_SIZE,
+        shuffle=SHUFFLE,
+        num_workers=NUM_WORKERS,
+        pin_memory=PIN_MEMORY,
+        drop_last=DROP_LAST,
     )
     return dataloader

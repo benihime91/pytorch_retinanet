@@ -7,7 +7,7 @@ import torch
 from torch import nn
 from torch.functional import Tensor
 
-from ..config import *
+from src.config import *
 
 
 def ifnone(a: Any, b: Any) -> Any:
@@ -144,9 +144,7 @@ class AnchorGenerator(nn.Module):
         return [len(cell_anchors) for cell_anchors in self.cell_anchors]
 
     @staticmethod
-    def generate_cell_anchors(
-        sizes: tuple[float], aspect_ratios: tuple[float]
-    ) -> Tensor:
+    def generate_cell_anchors(sizes, aspect_ratios) -> Tensor:
         """
         Generates a Tensor storing cannonical anchor boxes, where all
         anchor boxes are of different sizes & aspect ratios centered at (0,0).
