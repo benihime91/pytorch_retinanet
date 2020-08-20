@@ -1,1 +1,1 @@
-/Users/ayushman/Desktop/pytorch_retinanet/src/config.py
+pytorch_retinanet/src/config.py
