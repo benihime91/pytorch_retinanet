@@ -1,2 +1,2 @@
-# `Evaluation Scripts are` taken from : 
+# Evaluation Scripts are taken from : 
 > https://github.com/PyTorchLightning/wheat
