@@ -100,17 +100,18 @@ class CSVDataset(Dataset):
         # Grab the `transformed` `image`, `bboxes`, `class_labels`
         image = transformed["image"]
         boxes = torch.as_tensor(transformed["bboxes"], dtype=torch.float32)
-        class_labels = torch.as_tensor(transformed["class_labels"], dtype=torch.int32)
+        class_labels = torch.as_tensor(transformed["class_labels"])
 
         # Create the `Target` Dictionary
+        image_idx = torch.tensor([idx])
         target = {}
-        target["image_id"] = torch.tensor([idx])
-        target["image_id"] = torch.tensor([idx])
+        target["image_id"] = image_idx
+        target["boxes"] = boxes
         target["labels"] = class_labels
         target["area"] = area
         target["iscrowd"] = iscrowd
 
-        return image.float(), target
+        return image, target, image_idx
 
 
 def collate_fn(batch):
