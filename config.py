@@ -22,8 +22,8 @@ MAX_IMAGE_SIZE: int = 1333
 # -----------------------------------------------------------------------------
 # Csv File Options. Each Item in the csv should `correspond` to a single annotation.
 # `targets` should be `Integers`.
-TRAIN_CSV_DIR: str = None  # Specify the path to train csv here
-VAL_CSV_DIR: str = None  # Specify the path to the validation csv here
+TRAIN_CSV_DIR: str = "train.csv"  # Specify the path to train csv here
+VAL_CSV_DIR: str = "valid.csv"  # Specify the path to the validation csv here
 # csv header pointing to the `image_paths`.
 IMG_HEADER: str = "filepath"
 # csv header pointing to the `xmin` of `annotations`.
