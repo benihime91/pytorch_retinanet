@@ -7,7 +7,8 @@ from torch.utils.data import DataLoader, Dataset
 
 import config as cfg
 from src.anchors import ifnone
-from transforms import get_transformations
+
+from .transforms import get_transformations
 
 
 class CSVDataset(Dataset):
