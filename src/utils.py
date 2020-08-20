@@ -7,7 +7,7 @@ from torch.functional import Tensor
 from torchvision.ops.boxes import box_iou
 
 from src.config import *
-from .anchors import ifnone
+from src.anchors import ifnone
 
 
 def bbox_2_activ(ground_truth_boxes: Tensor, anchors: Tensor) -> Tensor:

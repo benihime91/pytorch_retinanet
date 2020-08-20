@@ -5,10 +5,9 @@ import pandas as pd
 import torch
 from torch.utils.data import DataLoader, Dataset
 
-from src.config import *
 from src.anchors import ifnone
-
-from .transforms import get_transformations
+from src.config import *
+from src.transforms import get_transformations
 
 
 class CSVDataset(Dataset):

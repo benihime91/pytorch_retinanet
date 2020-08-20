@@ -9,7 +9,7 @@ from torch import nn as nn
 from torch.functional import Tensor
 
 from src.config import *
-from .utils import retinanet_loss
+from src.utils import retinanet_loss
 
 __all__ = ["resnet18", "resnet34", "resnet50", "resnet101", "resnet152"]
 
