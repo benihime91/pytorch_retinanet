@@ -1,8 +1,5 @@
 from typing import *
 
-import albumentations as A
-from albumentations.pytorch import ToTensorV2 as ToTensor
-
 # -----------------------------------------------------------------------------
 # Config definition
 # -----------------------------------------------------------------------------
@@ -20,19 +17,15 @@ MIN_IMAGE_SIZE: int = 600
 MAX_IMAGE_SIZE: int = 1333
 # `Maximum` size of the image to be rescaled before feeding it to the backbone
 
-
 # -----------------------------------------------------------------------------
-# `Dataset` & `DataLoader` Options
+# `Dataset` Flags
 # -----------------------------------------------------------------------------
 # Csv File Options. Each Item in the csv should `correspond` to a single annotation.
 # `targets` should be `Integers`.
-# Path(s) to the csv `file` or the `csv` files.
-TRAIN_CSV_DIR: str = None
-VALID_CSV_DIR: str = None
-
+TRAIN_CSV_DIR: str = None  # Specify the path to train csv here
+VAL_CSV_DIR: str = None  # Specify the path to the validation csv here
 # csv header pointing to the `image_paths`.
 IMG_HEADER: str = "filepath"
-
 # csv header pointing to the `xmin` of `annotations`.
 XMIN_HEADER: str = "xmin"
 # csv header pointing to the `ymin` of `annotations`.
@@ -44,60 +37,9 @@ YMAX_HEADER: str = "ymax"
 # csv header pointing to the `classes` of the `bboxes`.
 CLASS_HEADER: str = "targets"
 
-# Albumentations transformations to apply to the `Images` & `bboxes`
-# check : https://albumentations.ai/docs/getting_started/transforms_and_targets/
-# to see which transformations are valid for bbox augmentations.
-
-# Valid Transformations
-VALID_TRANSFORMATIONS: List = [
-    A.ToFloat(max_value=255.0, always_apply=True),
-    ToTensor(always_apply=True),
-]
-
-
-# Train Transformations
-TRAIN_TRANSFORMATIONS: List = [
-    A.CLAHE(),
-    A.RandomBrightness(),
-    A.HueSaturationValue(),
-    A.OneOf(
-        [
-            A.RandomRain(),
-            A.RandomFog(),
-            A.RandomSunFlare(),
-            A.RandomBrightnessContrast(),
-            A.GaussianBlur(),
-        ]
-    ),
-    A.IAASharpen(),
-    A.HorizontalFlip(),
-    A.Cutout(),
-    A.ToGray(p=0.25),
-]
-TRAIN_TRANSFORMATIONS = TRAIN_TRANSFORMATIONS + VALID_TRANSFORMATIONS
-
-TRANSFORMATIONS: Dict[str, A.Compose] = {
-    "train_transforms": (
-        A.Compose(
-            TRAIN_TRANSFORMATIONS,
-            p=1.0,
-            bbox_params=A.BboxParams(
-                format="pascal_voc", label_fields=["class_labels"]
-            ),
-        )
-    ),
-    "valid_transforms": (
-        A.Compose(
-            VALID_TRANSFORMATIONS,
-            p=1.0,
-            bbox_params=A.BboxParams(
-                format="pascal_voc", label_fields=["class_labels"]
-            ),
-        )
-    ),
-}
-
-# Options for a `PyTorch` `DataLoader` instance
+# -----------------------------------------------------------------------------
+# PyTorch DataLoader Flags
+# -----------------------------------------------------------------------------
 SHUFFLE: bool = True
 BATCH_SIZE: bool = 8
 PIN_MEMORY: bool = True
@@ -125,8 +67,8 @@ ANCHOR_ASPECT_RATIOS: List[float] = [0.5, 1.0, 2.0]
 IOU_THRESHOLDS_FOREGROUND: float = 0.4
 IOU_THRESHOLDS_BACKGROUND: float = 0.5
 # IoU overlap ratio `bg`, `fg` for labeling anchors.
-IGNORE_IDX: Any[int] = -2
-BACKGROUND_IDX: Any[int] = -1
+IGNORE_IDX: Any = -2
+BACKGROUND_IDX: Any = -1
 # Anchors with < bg are labeled negative (-1)
 # Anchors  with >= bg and < fg are ignored (-2)
 BBOX_REG_WEIGHTS: List[float] = [1.0, 1.0, 1.0, 1.0]

@@ -72,11 +72,11 @@ class Retinanet(nn.Module):
         score_thres: float = cfg.SCORE_THRES,
         max_detections_per_images: int = cfg.MAX_DETECTIONS_PER_IMAGE,
         freeze_bn: bool = cfg.FREEZE_BN,
-        anchor_generator: Callable = None,
         min_size: int = cfg.MIN_IMAGE_SIZE,
         max_size: int = cfg.MAX_IMAGE_SIZE,
         image_mean: List[float] = cfg.MEAN,
         image_std: List[float] = cfg.STD,
+        anchor_generator: Optional[AnchorGenerator] = None,
     ) -> None:
 
         # The reason for the 0.05 is because that is what appears to be used by other systems as well,
