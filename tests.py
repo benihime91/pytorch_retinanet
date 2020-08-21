@@ -14,7 +14,7 @@ def load_transformations(cfg: DictConfig):
     return transformations
 
 
-@hydra.main(config_path="conf/config.yaml")
+@hydra.main(config_path="configs/config.yaml")
 def get_config(cfg: DictConfig) -> None:
     tfms = load_transformations(cfg)
     print(tfms)
