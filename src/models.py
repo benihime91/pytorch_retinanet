@@ -133,7 +133,7 @@ class Retinanet(nn.Module):
         )
 
         # Instantiate anchor Generator
-        self.anchor_generator = ifnone(anchor_generator, AnchorGenerator())
+        self.anchor_generator = anchor_generator
         self.num_anchors = self.anchor_generator.num_cell_anchors[0]
 
         # Instantiate `RetinaNetHead`
