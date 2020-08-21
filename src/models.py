@@ -170,6 +170,7 @@ class Retinanet(nn.Module):
             if targs["boxes"].numel() == 0:
                 matched_idxs.append(torch.empty((0,), dtype=torch.int32))
                 continue
+
             matched_idxs.append(matcher(targs["boxes"], ancs))
 
         return self.retinanet_head.compute_loss(targets, outputs, anchors, matched_idxs)

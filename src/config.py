@@ -40,7 +40,7 @@ ANCHOR_ASPECT_RATIOS: List[float] = [0.5, 1.0, 2.0]
 IOU_THRESHOLDS_FOREGROUND: float = 0.4
 IOU_THRESHOLDS_BACKGROUND: float = 0.5
 # IoU overlap ratio `bg`, `fg` for labeling anchors.
-IGNORE_IDX: Any = -2
+IGNORE_IDX: Any = 0
 BACKGROUND_IDX: Any = -1
 # Anchors with < bg are labeled negative (-1)
 # Anchors  with >= bg and < fg are ignored (-2)

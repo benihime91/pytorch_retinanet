@@ -80,12 +80,13 @@ def classification_loss(
             # determine only the foreground
             foreground_idxs_ = m_idx >= 0
             num_foreground = foreground_idxs_.sum()
-            gt_targs = torch.zeros_like(cls_pred, device=device)
 
             # create the target classification
+            gt_targs = torch.zeros_like(cls_pred, device=device)
             gt_targs[
                 foreground_idxs_, tgt["labels"][m_idx[foreground_idxs_]]
             ] = torch.tensor(1.0, device=device)
+
             # find indices for which anchors should be ignored
             valid_idxs = m_idx != IGNORE_IDX
 
