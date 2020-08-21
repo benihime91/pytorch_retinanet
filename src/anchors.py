@@ -183,7 +183,7 @@ class AnchorGenerator(nn.Module):
             shifts = torch.stack((shift_x, shift_y, shift_x, shift_y), dim=1)
             # shift base anchors to get the set of anchors for a full feature map
             anchors.append(
-                (shifts.view(-1, 1, 4) + base_anchors.view(1, -1, 4)).reshape(-1, 4)
+                (shifts.view(-1, 1, 4) + base_anchors.view(1, -1, 4)).reshape(-1, 4).to(device)
             )
 
         return anchors
