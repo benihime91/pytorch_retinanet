@@ -1,11 +1,9 @@
 from typing import *
-
 import torch
 import torch.nn as nn
 from torch.functional import Tensor
 from torchvision.models.detection.transform import GeneralizedRCNNTransform
 from torchvision.ops.boxes import clip_boxes_to_image, nms, remove_small_boxes
-
 from .anchors import AnchorGenerator
 from .config import *
 from .layers import FPN, RetinaNetHead, get_backbone

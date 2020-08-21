@@ -1,13 +1,11 @@
 import math
 from typing import *
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
 from torch import nn as nn
 from torch.functional import Tensor
-
 from .config import *
 from .utils import retinanet_loss
 
@@ -24,10 +22,8 @@ funcs = {
 
 class EmptyLayer(nn.Module):
     " PlaceHolder for `AvgPool` and `FC Layer` "
-
     def __init__(self) -> None:
         super(EmptyLayer, self).__init__()
-
     def forward(self, xb):
         return xb
 
@@ -110,21 +106,16 @@ class FPN(nn.Module):
         # `conv layers` to calculate `p3`
         self.conv_c3_1x1 = nn.Conv2d(C_3_size, out_channels, 1, 1, padding=0)
         self.conv_c3_3x3 = nn.Conv2d(out_channels, out_channels, 3, 1, padding=1)
-
         # `conv layers` to calculate `p4`
         self.conv_c4_1x1 = nn.Conv2d(C_4_size, out_channels, 1, 1, padding=0)
         self.conv_c4_3x3 = nn.Conv2d(out_channels, out_channels, 3, 1, padding=1)
-
         # `conv layers` to calculate `p5`
         self.conv_c5_1x1 = nn.Conv2d(C_5_size, out_channels, 1, 1, padding=0)
         self.conv_c5_3x3 = nn.Conv2d(out_channels, out_channels, 3, 1, padding=1)
-
         # `conv layers` to calculate `p6`
         self.conv_c6_3x3 = nn.Conv2d(C_5_size, out_channels, 3, stride=2, padding=1)
-
         # `conv layers` to calculate `p7`
         self.conv_c7_3x3 = nn.Conv2d(out_channels, out_channels, 3, stride=2, padding=1)
-
         # `upsample layer` to increase `output_size` for `elementwise-additions`
         # with previous pyramid level
         self.upsample_2x = nn.Upsample(scale_factor=2, mode="nearest")
@@ -136,16 +127,13 @@ class FPN(nn.Module):
         p3_output = self.conv_c3_1x1(C3)
         p4_output = self.conv_c4_1x1(C4)
         p5_output = self.conv_c5_1x1(C5)
-
         # Upsample & add ouputs[element-wise]: (p4 and p5) & (p3 and p4)
         p4_output = p4_output + self.upsample_2x(p5_output)
         p3_output = p3_output + self.upsample_2x(p4_output)
-
         # `3x3 stride-1 Convs` to obtain `p3`, `p4`, `p5`
         p3_output = self.conv_c3_3x3(p3_output)
         p4_output = self.conv_c4_3x3(p4_output)
         p5_output = self.conv_c5_3x3(p5_output)
-
         # Calculate p6 & p7
         # `p6` is obtained via a `3x3 stride-2 conv` on `C5`
         p6_output = self.conv_c6_3x3(C5)

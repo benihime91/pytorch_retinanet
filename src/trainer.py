@@ -1,11 +1,9 @@
 from typing import *
-
 import pytorch_lightning as pl
 import torch
 from torch import nn
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
-
 from .eval_utils.coco_eval import CocoEvaluator
 from .eval_utils.coco_utils import get_coco_api_from_dataset
 
