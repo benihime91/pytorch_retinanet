@@ -13,8 +13,6 @@ from .utils import activ_2_bbox
 __small__ = ["resnet18", "resnet34"]
 __big__ = ["resnet50", "resnet101", "resnet101", "resnet152"]
 
-# TODO : Make changes to make compatible with `torchvision` coco_evaluate script
-
 
 class Retinanet(nn.Module):
     """
@@ -104,7 +102,7 @@ class Retinanet(nn.Module):
 
         # Instantiate `GeneralizedRCNNTransform to Resize Images`
         # Transoforms Input Images
-        self.pre_tfms = GeneralizedRCNNTransform(
+        self.transform_inputs = GeneralizedRCNNTransform(
             min_size, max_size, image_mean, image_std
         )
 
@@ -129,160 +127,16 @@ class Retinanet(nn.Module):
         self.fpn = FPN(
             self.fpn_szs[0], self.fpn_szs[1], self.fpn_szs[2], out_channels=256
         )
-
         # Instantiate anchor Generator
         self.anchor_generator = anchor_generator
-        self.num_anchors = self.anchor_generator.num_cell_anchors[0]
-
+        self.num_anchors = self.anchor_generator.num_cell_anchors[
+            0
+        ]  # no. of anchors per cell
         # Instantiate `RetinaNetHead`
         self.retinanet_head = RetinaNetHead(
-            256, num_classes, 256, self.num_anchors, prior
+            256, 256, self.num_anchors, num_classes, prior
         )
-
         # Parameters
         self.score_thres = score_thres
         self.nms_thres = nms_thres
         self.detections_per_images = max_detections_per_images
-
-    def compute_retinanet_loss(self, targets, outputs, anchors):
-        loss = self.retinanet_head.retinanet_focal_loss(targets, outputs, anchors)
-        return loss
-
-    def process_detections(
-        self,
-        outputs: Dict[str, Tensor],
-        anchors: List[Tensor],
-        image_shapes: List[Tuple[int, int]],
-    ) -> Dict[str, Tensor]:
-
-        # # Modified From :
-        # https: // github.com/pytorch/vision/blob/master/torchvision/models/detection/roi_heads.py
-
-        # shape: (None, H*W*num_anchors, num_classes)
-        pred_classes = outputs.pop("logits")
-        pred_boxes = outputs.pop("bboxes")  # shape: (None, H*W*num_anchors, 4)
-
-        device = pred_classes.device
-        num_classes = pred_classes.shape[-1]
-
-        # create pred_labels for each score
-        pred_labels = torch.arange(num_classes, device=device)
-        # make pred_labels same shape as pred_classes: [batch_size, num_boxes , num_classes]
-        pred_labels = pred_labels.view(1, -1).expand_as(pred_classes)
-
-        detections = []
-
-        for pred_box, pred_cls, pred_lbl, anc, sz in zip(
-            pred_boxes, pred_classes, pred_labels, anchors, image_shapes
-        ):
-
-            # Transfrom the `retinanet_activations` into `bboxes`
-            pred_box = activ_2_bbox(pred_box, anc)
-            # Clip the `bboxes`
-            pred_box = clip_boxes_to_image(pred_box, sz)
-
-            all_boxes = []
-            all_scores = []
-            all_labels = []
-
-            # Iterate over all the classes
-            for cls_idx in range(num_classes):
-
-                # Filter Detections using Score_threshold: Remove Low Scoring Boxes
-                inds = torch.gt(pred_cls[:, cls_idx], self.score_thres)
-                # Filter out the cls_idx
-                pred_box_per_cls, pred_cls_per_cls, pred_lbl_per_cls = (
-                    pred_box[inds],
-                    pred_cls[inds, cls_idx],
-                    pred_lbl[inds, cls_idx],
-                )
-
-                ######################################################################
-                ########## Compute Detections for Single Class : cls_idx #############
-                ######################################################################
-                # 1. Filter empty boxes
-                keep_mask = remove_small_boxes(pred_box_per_cls, min_size=1e-02)
-                pred_box_per_cls, pred_cls_per_cls, pred_lbl_per_cls = (
-                    pred_box_per_cls[keep_mask],
-                    pred_cls_per_cls[keep_mask],
-                    pred_lbl_per_cls[keep_mask],
-                )
-
-                # 2. Do NMS
-                keep_mask = nms(pred_box_per_cls, pred_cls_per_cls, self.nms_thres)
-
-                # 3. Keep top classes upto `detections_per_images`
-                keep_mask = keep_mask[: self.detections_per_images]
-
-                # 4. Gather predictions
-                pred_box_per_cls, pred_cls_per_cls, pred_lbl_per_cls = (
-                    pred_box_per_cls[keep_mask],
-                    pred_cls_per_cls[keep_mask],
-                    pred_lbl_per_cls[keep_mask],
-                )
-
-                # Update `ouputs` list
-                all_boxes.append(pred_box_per_cls)
-                all_scores.append(pred_cls_per_cls)
-                all_labels.append(pred_lbl_per_cls)
-
-            # Update Detection Dictionary
-            detections.append(
-                {
-                    "boxes": torch.cat(all_boxes, dim=0),
-                    "labels": torch.cat(all_labels, dim=0),
-                    "scores": torch.cat(all_scores, dim=0),
-                }
-            )
-
-        return detections
-
-    def forward(self, images: Tensor, targets: Dict[str, Tensor] = None):
-        "returns `detections` if model is `eval` else returns `loss`"
-
-        if self.training:
-            assert (
-                targets is not None
-            ), "If model is `training`, `targets` must be given."
-
-        # Grab the original Image sizes
-        original_image_sizes = []
-        for img in images:
-            sz = img.shape[-2:]
-            assert len(sz) == 2, "Invalid `image_size`"
-            original_image_sizes.append((sz[0], sz[1]))
-
-        # Transform the Inputs
-        images, targets = self.pre_tfms(images, targets)
-
-        # Get the `feature_maps` from the `backbone`
-        feature_maps: List[Tensor] = self.backbone(images.tensors)
-        # Get `outputs` from `FPN`
-        outputs = self.fpn(feature_maps)
-        # Get `head_outputs` from `RetinaNetHead`
-        head_outputs = self.retinanet_head(outputs)
-
-        # create anchors
-        anchors = self.anchor_generator(outputs)
-
-        losses = {}
-        detections = {}
-
-        if self.training:
-            # Compute Losses
-            losses = self.compute_retinanet_loss(targets, head_outputs, anchors)
-
-            return losses
-
-        else:
-            with torch.no_grad():
-                # Compute Detections
-                detections = self.process_detections(
-                    head_outputs, anchors, images.image_sizes
-                )
-
-                detections = self.pre_tfms.postprocess(
-                    detections, images.image_sizes, original_image_sizes
-                )
-
-            return detections
