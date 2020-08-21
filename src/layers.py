@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from torch.functional import Tensor
 from typing import *
 from .config import *
-from .losses import classification_loss, regression_loss
+from .losses import RetinaNetLosses
 
 
 class FPN(nn.Module):
@@ -90,6 +90,7 @@ class RetinaNetHead(nn.Module):
         self.regression_head = RetinaNetBoxSubnet(
             in_channels, out_channels, num_anchors
         )
+        self.losses = RetinaNetLosses()
 
     def compute_loss(
         self,
@@ -101,8 +102,12 @@ class RetinaNetHead(nn.Module):
 
         # Calculate Losses
         output_dict = {
-            "classification_loss": classification_loss(targets, outputs, matched_idxs),
-            "bbox_regression": regression_loss(targets, outputs, anchors, matched_idxs),
+            "classification_loss": self.losses.classification_loss(
+                targets, outputs, matched_idxs
+            ),
+            "bbox_regression": self.losses.regression_loss(
+                targets, outputs, anchors, matched_idxs
+            ),
         }
         return output_dict
 
