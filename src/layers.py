@@ -91,14 +91,22 @@ class RetinaNetHead(nn.Module):
             in_channels, out_channels, num_anchors
         )
 
-    def compute_loss(self, targets, outputs, anchors, matched_idxs):
+    def compute_loss(
+        self,
+        targets: List[Dict[str, Tensor]],
+        outputs: Dict[str, Tensor],
+        anchors: List[Tensor],
+        matched_idxs: List[Tensor],
+    ) -> Dict[str, Tensor]:
+
+        # Calculate Losses
         output_dict = {
             "classification_loss": classification_loss(targets, outputs, matched_idxs),
-            "bbox_regression": regression_loss(targets, outputs, anchors),
+            "bbox_regression": regression_loss(targets, outputs, anchors, matched_idxs),
         }
         return output_dict
 
-    def forward(self, xb):
+    def forward(self, xb: Tensor) -> Dict[str, Tensor]:
         output_dict = {
             "cls_preds": self.classification_head(xb),
             "bbox_preds": self.regression_head(xb),
@@ -153,6 +161,7 @@ class RetinaNetClassSubnet(nn.Module):
         self.class_subnet_output = nn.Conv2d(
             out_channels, num_anchors * num_classes, 3, stride=1, padding=1
         )
+
         # Initialize the Final Layer as given in :paper: `RetinaNet`
         torch.nn.init.normal_(self.class_subnet_output.weight, std=0.01)
         torch.nn.init.constant_(
@@ -216,6 +225,7 @@ class RetinaNetBoxSubnet(nn.Module):
         self.box_subnet_output = nn.Conv2d(
             out_channels, num_anchors * 4, 3, padding=1, stride=1
         )
+
         # Initialize the Final Layer as given in :paper: `RetinaNet`
         torch.nn.init.normal_(self.output.weight, std=0.01)
         torch.nn.init.zeros_(self.output.bias)
@@ -225,7 +235,7 @@ class RetinaNetBoxSubnet(nn.Module):
                 torch.nn.init.zeros_(layer.bias)
 
     def forward(self, feature_maps):
-        outputs = []
+        bbox_preds = []
 
         for features in feature_maps:
             # in: [num_batches, ..., height, width]
@@ -237,7 +247,7 @@ class RetinaNetBoxSubnet(nn.Module):
             x = x.permute(0, 3, 4, 1, 2)
             x = x.reshape(N, -1, 4)
             # out: [num_batches, (height*width*num_anchors), num_classes]
-            outputs.append(x)
+            bbox_preds.append(x)
         # Concatenate along (height*wdth*num_anchors) dimension
-        outputs = torch.cat(outputs, dim=1)
-        return outputs
+        bbox_preds = torch.cat(bbox_preds, dim=1)
+        return bbox_preds

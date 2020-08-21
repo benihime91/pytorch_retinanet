@@ -100,43 +100,63 @@ class Retinanet(nn.Module):
             backbone_kind in __small__ + __big__
         ), f" Expected `backbone_kind` to be one of {__small__+__big__} got {backbone_kind}"
 
-        # Instantiate `GeneralizedRCNNTransform to Resize Images`
-        # Transoforms Input Images
+        # ------------------------------------------------------
+        # Assemble `RetinaNet`
+        # ------------------------------------------------------
+
+        # # Instantiate `GeneralizedRCNNTransform` to resize inputs
         self.transform_inputs = GeneralizedRCNNTransform(
             min_size, max_size, image_mean, image_std
         )
-
         # Get the back bone of the Model
-        self.backbone = get_backbone(backbone_kind, pretrained, freeze_bn=freeze_bn)
+        self.backbone_kind = backbone_kind
+        self.backbone = get_backbone(
+            self.backbone_kind, pretrained, freeze_bn=freeze_bn
+        )
+        # # Grab the backbone output channels
+        self.fpn_szs = self._get_backbone_ouputs()
+        # # Instantiate the `FPN`
+        self.fpn = FPN(
+            self.fpn_szs[0], self.fpn_szs[1], self.fpn_szs[2], out_channels=256
+        )
+        # # Instantiate anchor Generator
+        self.anchor_generator = anchor_generator
+        self.num_anchors = self.anchor_generator.num_cell_anchors[0]
+        # # Instantiate `RetinaNetHead`
+        self.retinanet_head = RetinaNetHead(
+            256, 256, self.num_anchors, num_classes, prior
+        )
 
-        # Grab the backbone output channels
-        if backbone_kind in __small__:
-            self.fpn_szs = [
+        # ------------------------------------------------------
+        # Parameters
+        # ------------------------------------------------------
+        self.score_thres = score_thres
+        self.nms_thres = nms_thres
+        self.detections_per_images = max_detections_per_images
+
+    def _get_backbone_ouputs(self) -> List:
+        if self.backbone_kind in __small__:
+            fpn_szs = [
                 self.backbone.backbone.layer2[1].conv2.out_channels,
                 self.backbone.backbone.layer3[1].conv2.out_channels,
                 self.backbone.backbone.layer4[1].conv2.out_channels,
             ]
-        elif backbone_kind in __big__:
-            self.fpn_szs = [
+        elif self.backbone_kind in __big__:
+            fpn_szs = [
                 self.backbone.backbone.layer2[2].conv3.out_channels,
                 self.backbone.backbone.layer3[2].conv3.out_channels,
                 self.backbone.backbone.layer4[2].conv3.out_channels,
             ]
+        return fpn_szs
 
-        # Instantiate the `FPN`
-        self.fpn = FPN(
-            self.fpn_szs[0], self.fpn_szs[1], self.fpn_szs[2], out_channels=256
-        )
-        # Instantiate anchor Generator
-        self.anchor_generator = anchor_generator
-        self.num_anchors = self.anchor_generator.num_cell_anchors[
-            0
-        ]  # no. of anchors per cell
-        # Instantiate `RetinaNetHead`
-        self.retinanet_head = RetinaNetHead(
-            256, 256, self.num_anchors, num_classes, prior
-        )
-        # Parameters
-        self.score_thres = score_thres
-        self.nms_thres = nms_thres
-        self.detections_per_images = max_detections_per_images
+    @staticmethod
+    def process_detections(
+        outputs: Dict[str, Tensor], anchors: List[Tensor], image_shapes
+    ) -> List[Dict[str, Tensor]]:
+
+        cls_preds = outputs.pop("cls_preds")
+        bbox_preds = outputs.pop("bbox_preds")
+
+        device = cls_preds.device()
+        num_classes = cls_preds.shape[-1]
+
