@@ -42,17 +42,22 @@ class Retinanet(nn.Module):
 
     Arguments:
         - num_classes   (int): number of output classes of the model (excluding the background).
-        - backbone_kind (str): the network used to compute the features for the model. Currently support only `Resnet` networks.
+        - backbone_kind (str): the network used to compute the features for the model. 
+                               currently support only `Resnet` networks.
         - prior       (float): Prior prob for rare case (i.e. foreground) at the beginning of training.
         - pretrianed   (bool): Wether the backbone should be `pretrained` or not.
-        - nms_thres   (float): Overlap threshold used for non-maximum suppression (suppress boxes with IoU >= this threshold)
+        - nms_thres   (float): Overlap threshold used for non-maximum suppression 
+                               (suppress boxes with IoU >= this threshold)
         - score_thres (float): Minimum score threshold (assuming scores in a [0, 1] range.
         - max_detections_per_images(int): Number of proposals to keep after applying NMS.
         - freeze_bn   (bool): Wether to freeze the `BatchNorm` layers of the `BackBone` network.
-        - anchor_generator(AnchorGenertor): Must be an instance of `AnchorGenerator`. If None the default AnchorGenerator is used.
+        - anchor_generator(AnchorGenertor): Must be an instance of `AnchorGenerator`. 
+                                            If None the default AnchorGenerator is used.
                                             see `config.py`
-        - min_size (int)    : `minimum size` of the image to be rescaled before feeding it to the backbone.
-        - max_size (int)    : `maximum size` of the image to be rescaled before feeding it to the backbone.
+        - min_size (int)    : `minimum size` of the image to be rescaled before 
+                               feeding it to the backbone.
+        - max_size (int)    : `maximum size` of the image to be rescaled before 
+                               feeding it to the backbone.
         - image_mean (List[float]): mean values used for input normalization.
         - image_std (List[float]): std values used for input normalization.
 
@@ -149,14 +154,78 @@ class Retinanet(nn.Module):
             ]
         return fpn_szs
 
-    @staticmethod
     def process_detections(
-        outputs: Dict[str, Tensor], anchors: List[Tensor], image_shapes
+        self,
+        outputs: Dict[str, Tensor],
+        anchors: List[Tensor],
+        im_szs: List[Tuple[int, int]],
     ) -> List[Dict[str, Tensor]]:
 
-        cls_preds = outputs.pop("cls_preds")
+        scores = outputs.pop("cls_preds")
         bbox_preds = outputs.pop("bbox_preds")
 
-        device = cls_preds.device()
-        num_classes = cls_preds.shape[-1]
+        device = scores.device()
+        num_classes = scores.shape[-1]
+
+        # create labels for each score
+        labels = torch.arange(num_classes, device=device)
+        labels = labels.view(1, -1).expand_as(scores)
+
+        final_detections = []
+
+        for bb_per_im, sc_per_im, lbl_per_im, anc_per_im, im_sz in zip(
+            bbox_preds, scores, labels, anchors, im_szs
+        ):
+
+            # Convert the activations: outputs from the model in bboxes
+            boxes_per_image = activ_2_bbox(bb_per_im, anc_per_im)
+            # clip boxes to image size
+            boxes_per_image = clip_boxes_to_image(boxes_per_image, im_sz)
+
+            all_boxes = []
+            all_scores = []
+            all_labels = []
+
+            for cls_idx in range(num_classes):
+                # remove low scoring boxes
+                lw_idx = torch.gt(sc_per_im[:, cls_idx], self.score_thresh)
+
+                bb_per_cls, sc_per_cls, lbl_per_cls = (
+                    boxes_per_image[lw_idx],
+                    sc_per_im[lw_idx, cls_idx],
+                    lbl_per_im[lw_idx, cls_idx],
+                )
+                # remove empty boxes
+                mask = remove_small_boxes(bb_per_cls, min_size=1e-2)
+
+                bb_per_cls, sc_per_cls, lbl_per_cls = (
+                    bb_per_cls[mask],
+                    sc_per_cls[mask],
+                    lbl_per_cls[mask],
+                )
+
+                # non-maximum suppression, independently done per class
+                mask = nms(bb_per_cls, sc_per_cls, self.nms_thresh)
+
+                # mask only topk scoring predictions
+                mask = mask[: self.detections_per_img]
+                bb_per_cls, sc_per_cls, lbl_per_cls = (
+                    bb_per_cls[mask],
+                    sc_per_cls[mask],
+                    lbl_per_cls[mask],
+                )
+
+                all_boxes.append(bb_per_cls)
+                all_scores.append(sc_per_cls)
+                all_labels.append(lbl_per_cls)
+
+                final_detections.append(
+                    {
+                        "boxes": torch.cat(all_boxes, dim=0),
+                        "scores": torch.cat(all_scores, dim=0),
+                        "labels": torch.cat(all_labels, dim=0),
+                    }
+                )
+
+        return final_detections
 
