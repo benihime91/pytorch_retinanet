@@ -6,6 +6,8 @@
 # Check : https://github.com/albumentations-team/albumentations
 # for list of all available transforms and `API` docs.
 
+from typing import *
+
 # NB:
 # 1. Images should be transformed to have `pixel` values between 0, 1
 # 2. Images can also be of different shapes.
@@ -14,7 +16,6 @@
 import albumentations as A
 from albumentations.core.composition import Compose
 from albumentations.pytorch import ToTensorV2
-from typing import *
 
 # -----------------------------------------------------------------------------
 # `Default` Parameters

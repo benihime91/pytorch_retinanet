@@ -6,9 +6,10 @@ from torch.functional import Tensor
 from torchvision.models.detection.transform import GeneralizedRCNNTransform
 from torchvision.ops.boxes import clip_boxes_to_image, nms, remove_small_boxes
 
+from src.anchors import AnchorGenerator
 from src.config import *
-from src.anchors import AnchorGenerator, ifnone
 from src.layers import FPN, RetinaNetHead, get_backbone
+from src.utilities import ifnone
 from src.utils import activ_2_bbox
 
 __small__ = ["resnet18", "resnet34"]

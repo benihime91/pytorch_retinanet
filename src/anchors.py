@@ -8,14 +8,7 @@ from torch import nn
 from torch.functional import Tensor
 
 from src.config import *
-
-
-def ifnone(a: Any, b: Any) -> Any:
-    """`a` if `a` is not None, otherwise `b`"""
-    if a is not None:
-        return a
-    else:
-        return b
+from src.utilities import ifnone
 
 
 class BufferList(nn.Module):
