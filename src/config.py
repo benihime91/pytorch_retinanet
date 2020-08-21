@@ -57,7 +57,7 @@ NUM_CLASSES: int = 80
 
 # The network used to compute the features for the model.
 # Should be one of ['resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet101', 'resnet152'].
-BACKBONE: str = "resnet50"
+BACKBONE: str = "resnet18"
 
 # Prior prob for rare case (i.e. foreground) at the beginning of training.
 # This is used to set the bias for the logits layer of the classifier subnet.

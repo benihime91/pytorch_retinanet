@@ -119,15 +119,18 @@ class Retinanet(nn.Module):
         self.backbone = get_backbone(
             self.backbone_kind, pretrained, freeze_bn=freeze_bn
         )
+
         # # Grab the backbone output channels
         self.fpn_szs = self._get_backbone_ouputs()
         # # Instantiate the `FPN`
         self.fpn = FPN(
             self.fpn_szs[0], self.fpn_szs[1], self.fpn_szs[2], out_channels=256
         )
+
         # # Instantiate anchor Generator
         self.anchor_generator = anchor_generator
         self.num_anchors = self.anchor_generator.num_cell_anchors[0]
+
         # # Instantiate `RetinaNetHead`
         self.retinanet_head = RetinaNetHead(
             256, 256, self.num_anchors, num_classes, prior
@@ -138,7 +141,7 @@ class Retinanet(nn.Module):
         # ------------------------------------------------------
         self.score_thres = score_thres
         self.nms_thres = nms_thres
-        self.detections_per_images = max_detections_per_images
+        self.detections_per_img = max_detections_per_images
 
     def _get_backbone_ouputs(self) -> List:
         if self.backbone_kind in __small__:
@@ -181,7 +184,7 @@ class Retinanet(nn.Module):
         scores = outputs.pop("cls_preds")
         bbox_preds = outputs.pop("bbox_preds")
 
-        device = scores.device()
+        device = scores.device
         num_classes = scores.shape[-1]
 
         # create labels for each score
@@ -205,7 +208,7 @@ class Retinanet(nn.Module):
 
             for cls_idx in range(num_classes):
                 # remove low scoring boxes
-                lw_idx = torch.gt(sc_per_im[:, cls_idx], self.score_thresh)
+                lw_idx = torch.gt(sc_per_im[:, cls_idx], self.score_thres)
 
                 bb_per_cls, sc_per_cls, lbl_per_cls = (
                     boxes_per_image[lw_idx],
@@ -222,7 +225,7 @@ class Retinanet(nn.Module):
                 )
 
                 # non-maximum suppression, independently done per class
-                mask = nms(bb_per_cls, sc_per_cls, self.nms_thresh)
+                mask = nms(bb_per_cls, sc_per_cls, self.nms_thres)
 
                 # mask only topk scoring predictions
                 mask = mask[: self.detections_per_img]
@@ -236,15 +239,21 @@ class Retinanet(nn.Module):
                 all_scores.append(sc_per_cls)
                 all_labels.append(lbl_per_cls)
 
-                final_detections.append(
-                    {
-                        "boxes": torch.cat(all_boxes, dim=0),
-                        "scores": torch.cat(all_scores, dim=0),
-                        "labels": torch.cat(all_labels, dim=0),
-                    }
-                )
+            final_detections.append(
+                {
+                    "boxes": torch.cat(all_boxes, dim=0),
+                    "scores": torch.cat(all_scores, dim=0),
+                    "labels": torch.cat(all_labels, dim=0),
+                }
+            )
 
         return final_detections
+
+    def _get_outputs(self, losses, detections):
+        if self.training:
+            return losses
+        else:
+            return detections
 
     def forward(
         self, images: List[Tensor], targets: Optional[List[Dict[str, Tensor]]] = None
@@ -255,23 +264,32 @@ class Retinanet(nn.Module):
         # Grab the original Image sizes
         orig_im_szs = []
         for im in images:
-            orig_im_szs.append((im.shape[-2:][0], im.shape[-2:][1]))
+            val = im.shape[-2:]
+            assert len(val) == 2
+            orig_im_szs.append((val[0], val[1]))
 
         images, targets = self.transform_inputs(images, targets)
         feature_maps = self.backbone(images.tensors)
-        features = list(feature_maps.values())
-        outputs = self.retinanet_head(feature_maps)
-        anchors = self.anchor_generator(feature_maps)
+
+        fpn_outputs = self.fpn(feature_maps)
+        outputs = self.retinanet_head(fpn_outputs)
+
+        anchors = self.anchor_generator(fpn_outputs)
 
         losses = {}
-        detections = {}
+        detections = torch.jit.annotate(List[Dict[str, Tensor]], [])
 
         if self.training:
             losses = None
-            return losses
+
         else:
-            detections = self.process_detections(outputs, anchors, images.image_sizes)
-            detections = self.transform_inputs.postprocess(
-                detections, images.image_sizes, orig_im_szs
-            )
-            return detections
+            # compute the detections
+            with torch.no_grad():
+                detections = self.process_detections(
+                    outputs, anchors, images.image_sizes
+                )
+                detections = self.transform_inputs.postprocess(
+                    detections, images.image_sizes, orig_im_szs
+                )
+
+        return self._get_outputs(losses, detections)

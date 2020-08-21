@@ -20,8 +20,13 @@ def get_config(cfg: DictConfig) -> None:
     print(tfms)
 
 
-from src.models import Retinanet
+# from src.models import Retinanet
 
-if __name__ == '__main__':
-    m = Retinanet()
-    print(m)
+# if __name__ == "__main__":
+#     import torch
+
+#     m = Retinanet()
+#     m.eval()
+#     out = m([torch.randn(3, 355, 355), torch.randn(3, 355, 355)])
+#     print(m)
+#     print(out)
