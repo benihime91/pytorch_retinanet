@@ -116,31 +116,3 @@ class CSVDataset(Dataset):
         target["iscrowd"] = iscrowd
 
         return image, target, image_idx
-
-
-def collate_fn(batch):
-    return tuple(zip(*batch))
-
-
-def get_dataloader(
-    dataset: Optional[Dataset] = None, train: Optional[bool] = None,
-) -> DataLoader:
-    """
-    Returns a `PyTorch` DataLoader Instance for given `dataset`
-    If `Dataset` is None Dataset defaults to `CSVDataset`.
-    If `CSVDataset` then `train`(bool) must be given. Dataset will be loaded 
-    from the `Dataset Flags` given in config.py
-    """
-    if dataset is None:
-        assert train is not None, "if `dataset` is not given `train` must be specified"
-
-    dataset = ifnone(dataset, CSVDataset(trn=train))
-    dataloader = DataLoader(
-        dataset,
-        batch_size=BATCH_SIZE,
-        shuffle=SHUFFLE,
-        num_workers=NUM_WORKERS,
-        pin_memory=PIN_MEMORY,
-        drop_last=DROP_LAST,
-    )
-    return dataloader

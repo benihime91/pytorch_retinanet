@@ -38,15 +38,6 @@ YMAX_HEADER: str = "ymax"
 # csv header pointing to the `classes` of the `bboxes`.
 CLASS_HEADER: str = "targets"
 
-# -----------------------------------------------------------------------------
-# PyTorch DataLoader Flags
-# -----------------------------------------------------------------------------
-SHUFFLE: bool = True
-BATCH_SIZE: bool = 8
-PIN_MEMORY: bool = True
-NUM_WORKERS: int = 0
-DROP_LAST: bool = False
-
 
 # -----------------------------------------------------------------------------
 # `Anchor Generator` Flags
