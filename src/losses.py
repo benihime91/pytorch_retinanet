@@ -67,15 +67,16 @@ def classification_loss(
     # ---------------------------------------------------------------
     cls_preds = outputs["cls_preds"]
     device = [c.device for c in cls_preds][0]
+    dtype = [c.dtype for c in cls_preds][0]
 
-    classification_loss = torch.tensor(0.0, device=device)
+    classification_loss = torch.tensor(0.0, device=device, dtype=dtype)
 
     for tgt, cls_pred, m_idx in zip(targets, cls_preds, matched_idxs):
         # no matched_idxs means there were no annotations in this image
         if m_idx.numel() == 0:
             gt_targs = torch.zeros_like(cls_pred)
             valid_idxs = torch.arange(cls_pred.shape[0])
-            num_foreground = torch.tensor(0.0, device=device)
+            num_foreground = torch.tensor(0.0, device=device, dtype=dtype)
         else:
             # determine only the foreground
             foreground_idxs_ = m_idx >= 0
@@ -85,7 +86,7 @@ def classification_loss(
             gt_targs = torch.zeros_like(cls_pred, device=device)
             gt_targs[
                 foreground_idxs_, tgt["labels"][m_idx[foreground_idxs_]]
-            ] = torch.tensor(1.0, device=device)
+            ] = torch.tensor(1.0, device=device, dtype=dtype)
 
             # find indices for which anchors should be ignored
             valid_idxs = m_idx != IGNORE_IDX
@@ -109,8 +110,9 @@ def regression_loss(
     # ---------------------------------------------------------------
     bbox_preds = outputs["bbox_preds"]
     device = [bbox.device for bbox in bbox_preds][0]
+    dtype = [bbox.dtype for bbox in bbox_preds][0]
 
-    loss = torch.tensor(0.0, device=device)
+    loss = torch.tensor(0.0, device=device, dtype=dtype)
 
     for tgt, bbox, anc, idxs in zip(targets, bbox_preds, anchors, matched_idxs):
         # no matched_idxs means there were no annotations in this image
@@ -123,9 +125,9 @@ def regression_loss(
         num_foreground = foreground_idxs_.sum()
 
         # select only the foreground boxes
-        matched_gts = torch.tensor(matched_gts[foreground_idxs_, :], device=device)
-        bbox = torch.tensor(bbox[foreground_idxs_, :], device=device)
-        anc = torch.tensor(anc[foreground_idxs_, :], device=device)
+        matched_gts = torch.tensor(matched_gts[foreground_idxs_, :], device=dtype)
+        bbox = torch.tensor(bbox[foreground_idxs_, :], device=device, dtype=dtype)
+        anc = torch.tensor(anc[foreground_idxs_, :], device=device, dtype=dtype)
 
         # compute the regression targets
         targs = bbox_2_activ(matched_gts, anc)
