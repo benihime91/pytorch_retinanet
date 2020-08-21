@@ -1,11 +1,7 @@
-torchvision
-torch
 pycocotools
-numpy
 matplotlib
 opencv-python
 bounding-box
 albumentations==0.4.6
 pytorch-lightning
 hydra-core
-omegaconf
