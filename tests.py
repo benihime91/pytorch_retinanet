@@ -20,4 +20,8 @@ def get_config(cfg: DictConfig) -> None:
     print(tfms)
 
 
-get_config()
+from src.models import Retinanet
+
+if __name__ == '__main__':
+    m = Retinanet()
+    print(m)

@@ -145,7 +145,8 @@ class RetinaNetClassSubnet(nn.Module):
         num_classes: int,
         prior: float,
     ) -> None:
-        super(RetinaNetClassSubnet).__init__()
+        super(RetinaNetClassSubnet, self).__init__()
+
         self.num_classes = num_classes
         self.num_anchors = num_anchors
         self.class_subnet = nn.Sequential(
@@ -210,7 +211,9 @@ class RetinaNetBoxSubnet(nn.Module):
     """
 
     def __init__(self, in_channels: int, out_channels: int, num_anchors: int) -> None:
+
         super(RetinaNetBoxSubnet, self).__init__()
+
         self.num_anchors = num_anchors
         self.box_subnet = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, 3, padding=1, stride=1),
@@ -227,8 +230,8 @@ class RetinaNetBoxSubnet(nn.Module):
         )
 
         # Initialize the Final Layer as given in :paper: `RetinaNet`
-        torch.nn.init.normal_(self.output.weight, std=0.01)
-        torch.nn.init.zeros_(self.output.bias)
+        torch.nn.init.normal_(self.box_subnet_output.weight, std=0.01)
+        torch.nn.init.zeros_(self.box_subnet_output.bias)
         for layer in self.box_subnet.children():
             if isinstance(layer, nn.Conv2d):
                 torch.nn.init.normal_(layer.weight, std=0.01)
