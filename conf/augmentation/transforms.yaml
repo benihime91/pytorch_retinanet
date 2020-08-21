@@ -30,7 +30,7 @@ augmentation:
     bbox_params:
       format: pascal_voc
       label_fields:
-        - labels
+        - class_labels
   # Augmentations for `valid dataset`
   valid:
     augs:
@@ -44,4 +44,4 @@ augmentation:
     bbox_params:
       format: pascal_voc
       label_fields:
-        - labels
+        - class_labels
