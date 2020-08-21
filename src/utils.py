@@ -6,8 +6,8 @@ import torch.nn.functional as F
 from torch.functional import Tensor
 from torchvision.ops.boxes import box_iou
 
-from src.config import *
-from src.utilities import ifnone
+from .config import *
+from .utilities import ifnone
 
 
 def bbox_2_activ(ground_truth_boxes: Tensor, anchors: Tensor) -> Tensor:
@@ -231,8 +231,7 @@ def retinanet_loss(
         # one_hot encode the classification targets
         gt_class_target = torch.zeros_like(cls_pred)
         gt_class_target = [
-            class_mask,  # Grab the idx where foreground is predicted
-            # at each predicted class put the value to be 1
+            class_mask,
             cls_tgt["labels"][matches[class_mask]],
         ] = torch.tensor(1.0)
 

@@ -7,8 +7,8 @@ import torch
 from torch import device, nn
 from torch.functional import Tensor
 
-from src.config import *
-from src.utilities import ifnone
+from .config import *
+from .utilities import ifnone
 
 
 class BufferList(nn.Module):
@@ -183,7 +183,9 @@ class AnchorGenerator(nn.Module):
             shifts = torch.stack((shift_x, shift_y, shift_x, shift_y), dim=1)
             # shift base anchors to get the set of anchors for a full feature map
             anchors.append(
-                (shifts.view(-1, 1, 4) + base_anchors.view(1, -1, 4)).reshape(-1, 4).to(device)
+                (shifts.view(-1, 1, 4) + base_anchors.view(1, -1, 4))
+                .reshape(-1, 4)
+                .to(device)
             )
 
         return anchors
