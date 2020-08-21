@@ -280,7 +280,7 @@ class Retinanet(nn.Module):
         detections = torch.jit.annotate(List[Dict[str, Tensor]], [])
 
         if self.training:
-            losses = None
+            losses = self.compute_loss(targets, outputs, anchors)
 
         else:
             # compute the detections
