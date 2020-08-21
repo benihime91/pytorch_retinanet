@@ -4,19 +4,18 @@ import albumentations as A
 import cv2
 import pandas as pd
 import torch
-from omegaconf import DictConfig
-from omegaconf.omegaconf import OmegaConf
-from torch.utils.data import Dataset
+from omegaconf import DictConfig, OmegaConf
+from torch.utils.data import DataLoader, Dataset
 
-from src.config import *
-from src.utilities import ifnone, load_obj
+from .config import *
+from .utilities import ifnone, load_obj, collate_fn
 
 
 class CSVDataset(Dataset):
     """
     Returns a `torch.utils.data.Dataset` instance from `csv` values.
 
-    Each `CSV` file should contain 
+    Each `CSV` file should contain
         * filepath: path to the Input Image
         * xmin    : `xmin` values for the bounding boxes.
         * ymin    : `ymin` values for the bounding boxes.
@@ -29,7 +28,7 @@ class CSVDataset(Dataset):
     ---------
     1. trn          (bool)             :  Wether training data or `validation` data.
     2. directory    (str)              :  Path to `the csv` file.
-    3. filepath     (str)              : `CSV` header for the Image File Paths.        
+    3. filepath     (str)              : `CSV` header for the Image File Paths.
     4. xmin_header  (str)              : `CSV` header for the xmin values for the `annotations`.
     5. ymin_header  (str)              : `CSV` header for the xmin values for the `annotations`.
     6. xmax_header  (str)              : `CSV` header for the xmin values for the `annotations`.
@@ -130,3 +129,25 @@ class CSVDataset(Dataset):
         target["iscrowd"] = iscrowd
 
         return image, target, image_idx
+
+
+def get_dataloader(
+    dataset: Optional[Dataset] = None, train: Optional[bool] = None, **kwargs
+) -> DataLoader:
+    """
+    Returns a `PyTorch` DataLoader Instance for given `dataset`
+
+    Arguments:
+    ----------
+     1. dataset (Optional[Dataset]): `A torch.utils.Dataset` instance.
+                If `dataset` is None Dataset defaults to `CSVDataset`.
+                `CSV` dataset is loaded using default config flags given in `config.py`
+     2. train   (Optional[bool])   : boolean wheter train or valid.
+     3. **kwargs                   : Dataloader Flags
+    """
+    if dataset is None:
+        assert train is not None, "if `dataset` is not given `train` must be specified"
+
+    dataset = ifnone(dataset, CSVDataset(trn=train))
+    dataloader = DataLoader(dataset, collate_fn=collate_fn, **kwargs)
+    return dataloader
