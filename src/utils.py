@@ -143,7 +143,11 @@ def matcher(
     below_low_threshold = vals < back_thr
     between_thresholds = (vals >= back_thr) & (vals < match_thr)
 
-    matches[below_low_threshold] = torch.tensor(BACKGROUND_IDX, device=matches.device)
-    matches[between_thresholds] = torch.tensor(IGNORE_IDX, device=matches.device)
+    matches[below_low_threshold] = torch.tensor(
+        BACKGROUND_IDX, device=matches.device, dtype=matches.dtype
+    )
+    matches[between_thresholds] = torch.tensor(
+        IGNORE_IDX, device=matches.device, dtype=matches.dtype
+    )
 
     return matches
