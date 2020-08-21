@@ -1,100 +1,12 @@
 import math
 from typing import *
 import torch
-import torch.nn as nn
+from torch import nn
 import torch.nn.functional as F
-import torchvision
-from torch import nn as nn
 from torch.functional import Tensor
 from .config import *
-from .utils import retinanet_loss
-
-__all__ = ["resnet18", "resnet34", "resnet50", "resnet101", "resnet152"]
-
-funcs = {
-    "resnet18": torchvision.models.resnet18,
-    "resnet34": torchvision.models.resnet34,
-    "resnet50": torchvision.models.resnet50,
-    "resnet101": torchvision.models.resnet101,
-    "resnet152": torchvision.models.resnet152,
-}
-
-
-class EmptyLayer(nn.Module):
-    " PlaceHolder for `AvgPool` and `FC Layer` "
-
-    def __init__(self) -> None:
-        super(EmptyLayer, self).__init__()
-
-    def forward(self, xb):
-        return xb
-
-
-# Dictionary to store Intermediate Outputs
-inter_outs = {}
-
-
-class BackBone(nn.Module):
-    def __init__(
-        self,
-        kind: str = "resnet18",
-        hook_fn: Callable = None,
-        pretrained: bool = True,
-        freeze_bn: bool = True,
-    ) -> None:
-        """Create a Backbone from `kind`"""
-        super(BackBone, self).__init__()
-        build_fn = funcs[kind]
-        self.backbone = build_fn(pretrained=pretrained)
-        self.backbone.avgpool = EmptyLayer()
-        self.backbone.fc = EmptyLayer()
-
-        # Get the Feature maps from the intermediate layer outputs
-        self.backbone.layer2.register_forward_hook(hook_fn)
-        self.backbone.layer3.register_forward_hook(hook_fn)
-        self.backbone.layer4.register_forward_hook(hook_fn)
-
-        # Freeze batch_norm: Not sure why ?? but every other implementation does it
-        if freeze_bn:
-            for layer in self.modules():
-                if isinstance(layer, nn.BatchNorm2d):
-                    layer.eval()
-
-    def forward(self, xb: Tensor) -> List[Tensor]:
-        _ = self.backbone(xb)
-        out = [
-            inter_outs[self.backbone.layer2],
-            inter_outs[self.backbone.layer3],
-            inter_outs[self.backbone.layer4],
-        ]
-        return out
-
-
-def get_backbone(
-    kind: str = "resnet18", pretrained: bool = True, freeze_bn: bool = True
-) -> nn.Module:
-    """
-    Returns a `ResNet` Backbone.
-
-    Args:
-        1. kind       : (str) name of the resnet model eg: `resnet18`.
-        2. pretrained : (bool) wether to load pretrained `imagenet` weights.
-        3. freeze_bn  : (bool) wether to freeze `BatchNorm` layers.
-
-    Example:
-        >>> m = get_backbone(kind='resnet18')
-    """
-    assert kind in __all__, f"`kind` must be one of {__all__} got {kind}"
-
-    def hook_outputs(self, inp, out) -> None:
-        # Function to Hook Intermediate Outputs
-        inter_outs[self] = out
-
-    backbone = BackBone(
-        kind=kind, hook_fn=hook_outputs, pretrained=pretrained, freeze_bn=freeze_bn
-    )
-
-    return backbone
+from .losses import focal_loss, smooth_l1_loss
+from .utils import bbox_2_activ
 
 
 class FPN(nn.Module):
@@ -121,8 +33,13 @@ class FPN(nn.Module):
         # `upsample layer` to increase `output_size` for `elementwise-additions`
         # with previous pyramid level
         self.upsample_2x = nn.Upsample(scale_factor=2, mode="nearest")
+        # Initialize with `kaiming_uniform`
+        for m in self.children():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_uniform_(m.weight, a=1)
+                nn.init.constant_(m.bias, 0)
 
-    def forward(self, inps: List[Tensor]):
+    def forward(self, inps: List[Tensor]) -> List[Tensor]:
         C3, C4, C5 = inps
         # Calculate outputs from C3, C4, C5 [feature maps] using
         # `1x1 stride stide 1 convs` on `C3`, `C4`, `C5`
@@ -145,151 +62,12 @@ class FPN(nn.Module):
         return [p3_output, p4_output, p5_output, p6_output, p7_output]
 
 
-class BoxSubnet(nn.Module):
-    """
-    Box subnet for regeressing from anchor boxes to ground truth labels.
-    This subnet  applies 4 3x3 conv layers, each with `out_channels`
-    no of filters followed by a ReLU activation, followed by a 3x3
-    conv layer with (4 * num_anchors). For each anchor these 4 outputs, 
-    predict the relative offset between the abhor box & ground_truth.
-
-    Args:
-        in_channels (int) : number of input channels.
-        out_channels (out): no. of channels for each conv_layer.
-        num_anchors  (int): no. of anchors per-spatial location.
-
-    Returns:
-        Tensor of shape [None, (height * width * num_anchors), 4] where
-        each item correspond to the relative offset between the anchor box & ground_truth
-        per spatial location.
-    """
-
-    def __init__(
-        self, in_channels: int, out_channels: int = 256, num_anchors: int = 9
-    ) -> None:
-        super(BoxSubnet, self).__init__()
-        # Successive conv_layers
-        self.box_subnet = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, 3, padding=1, stride=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, 3, padding=1, stride=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, 3, padding=1, stride=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, 3, padding=1, stride=1),
-            nn.ReLU(inplace=True),
-        )
-
-        self.output = nn.Conv2d(out_channels, num_anchors * 4, 3, padding=1, stride=1)
-        # out shape: [batch_size, (num_anchors * 4), height, width]
-
-        torch.nn.init.normal_(self.output.weight, std=0.01)
-        torch.nn.init.zeros_(self.output.bias)
-
-        for layer in self.box_subnet.children():
-            if isinstance(layer, nn.Conv2d):
-                torch.nn.init.normal_(layer.weight, std=0.01)
-                torch.nn.init.zeros_(layer.bias)
-
-        self.num_anchors = num_anchors
-
-    def forward(self, xb: List[Tensor]) -> Tensor:
-        outputs = []
-
-        for features in xb:
-            x = self.box_subnet(features)
-            x = self.output(x)
-
-            # Reshape output from :
-            # (batch_size, 4 * num_anchors, H, W) -> (batch_size, H*W*num_anchors, 4).
-            N, _, H, W = x.shape
-            x = x.view(N, -1, 4, H, W)
-            x = x.permute(0, 3, 4, 1, 2)
-            x = x.reshape(N, -1, 4)  # Size=(N, HWA, 4)
-
-            outputs.append(x)
-
-        return torch.cat(outputs, dim=1)
-
-
-class ClassSubnet(nn.Module):
-    """
-    Class subnet for classifying anchor boxes.
-    This subnet  applies 4 3x3 conv layers, each with `out_channels`
-    no of filters followed by a ReLU activation, followed by a 3x3
-    conv layer with (num_classes*num_anchors) filters follwed by a 
-    `sigmoid` prediction.
-
-    Args:
-        in_channels  (int) : number of input channels.
-        num_classes  (int) : total number of classes.
-        num_anchors  (int) : no. of anchors per-spatial location.
-        prior (float)      : prior for `focal loss`.
-        out_channels (out) : no. of channels for each conv_layer.
-
-    Returns:
-        Tensor of shape [None, (height * width * num_anchors), num_classes] 
-        where each item correspond to the binary predictions per spatial location.
-    """
-
-    def __init__(
-        self,
-        in_channels: int,
-        num_classes: int,
-        num_anchors: int,
-        prior: float = PRIOR,
-        out_channels: int = 256,
-    ) -> None:
-
-        super(ClassSubnet, self).__init__()
-        self.num_classes = num_classes
-        self.num_anchors = num_anchors
-
-        self.class_subnet = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, 3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, 3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, 3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, 3, padding=1),
-            nn.ReLU(inplace=True),
-        )
-
-        self.output = nn.Conv2d(out_channels, (num_anchors * num_classes), 3, padding=1)
-
-        for layer in self.class_subnet.children():
-            if isinstance(layer, nn.Conv2d):
-                torch.nn.init.normal_(layer.weight, std=0.01)
-                torch.nn.init.constant_(layer.bias, 0)
-
-        torch.nn.init.normal_(self.output.weight, std=0.01)
-        torch.nn.init.constant_(self.output.bias, -math.log((1 - prior) / prior))
-
-    def forward(self, xb: List[Tensor]) -> Tensor:
-        outputs = []
-
-        for feature in xb:
-            x = self.class_subnet(feature)
-            # `F.sigmoid` is `deprecated`
-            x = torch.sigmoid(self.output(x))
-            # Permute classification output from :
-            # (batch_size, num_anchors * num_classes, H, W) to (batch_size, H * W * num_anchors, num_classes).
-            N, _, H, W = x.shape
-            x = x.view(N, -1, self.num_classes, H, W).permute(0, 3, 4, 1, 2)
-            x = x.reshape(N, -1, self.num_classes)
-
-            outputs.append(x)
-
-        outputs = torch.cat(outputs, dim=1)
-        return outputs
-
-
 class RetinaNetHead(nn.Module):
     """
-    A Regression & Classification Head for use in RetinaNet.
+    A regression & classification head for use in `RetinaNet`
 
-    Args:
+    Arguments :
+    ---------
         in_channels(int)  : number of input channels.
         out_channels (int): number of output feature channels.
         num_anchors (int) : number of anchors per_spatial_location.
@@ -301,34 +79,248 @@ class RetinaNetHead(nn.Module):
     def __init__(
         self,
         in_channels: int,
+        out_channels: int,
+        num_anchors: int,
         num_classes: int,
-        out_channels: int = 256,
-        num_anchors: int = 9,
-        prior: float = PRIOR,
+        prior: float,
     ) -> None:
-
         super(RetinaNetHead, self).__init__()
-
-        # Initialize `ClassSubnet`
-        self.classification_head = ClassSubnet(
-            in_channels, num_classes, num_anchors, prior, out_channels
+        self.classification_head = RetinaNetClassificationHead(
+            in_channels, out_channels, num_anchors, num_classes, prior
+        )
+        self.regression_head = RetinaNetRegressionHead(
+            in_channels, out_channels, num_anchors
         )
 
-        # Initialize `BoxSubnet`
-        self.regression_head = BoxSubnet(in_channels, out_channels, num_anchors)
+    def compute_loss(self, targets, outputs, anchors, matched_idxs):
+        output_dict = {
+            "classification_loss": self.classification_head.compute_loss(
+                targets, outputs, matched_idxs
+            ),
+            "bbox_regression": self.regression_head.compute_loss(
+                targets, outputs, anchors
+            ),
+        }
+        return output_dict
 
-    def forward(self, xb: List[Tensor]) -> Dict[str, Tensor]:
-        cls_logits = self.classification_head(xb)
-        bbox_regressions = self.regression_head(xb)
+    def forward(self, xb):
+        output_dict = {
+            "cls_preds": self.classification_head(xb),
+            "bbox_preds": self.regression_head(xb),
+        }
+        return output_dict
 
-        return {"logits": cls_logits, "bboxes": bbox_regressions}
+
+class RetinaNetClassificationHead(nn.Module):
+    """
+    Classification Head for use in RetinaNet.
+    This subnet  applies 4 3x3 conv layers, each with `out_channels`
+    no of filters followed by a ReLU activation, followed by a 3x3
+    conv layer with (num_classes*num_anchors) filters follwed by a 
+    `sigmoid` prediction.
+
+    Arguments:
+    ---------
+        in_channels  (int) : number of input channels.
+        num_classes  (int) : total number of classes.
+        num_anchors  (int) : no. of anchors per-spatial location.
+        out_channels (out) : no. of channels for each conv_layer.
+        prior (float)      : prior for `focal loss`.
+
+    Returns:
+    -------
+        Tensor of shape [None, (height * width * num_anchors), num_classes] 
+        where each item correspond to the binary predictions 
+        per spatial location.
+    """
+
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels,
+        num_anchors: int,
+        num_classes: int,
+        prior: float,
+    ) -> None:
+        super(RetinaNetClassificationHead).__init__()
+        self.num_classes = num_classes
+        self.num_anchors = num_anchors
+        self.class_subnet = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, 3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels, 3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels, 3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels, 3, padding=1),
+            nn.ReLU(inplace=True),
+        )
+        self.class_subnet_output = nn.Conv2d(
+            out_channels, num_anchors * num_classes, 3, stride=1, padding=1
+        )
+        # Initialize the Final Layer as given in :paper: `RetinaNet`
+        torch.nn.init.normal_(self.class_subnet_output.weight, std=0.01)
+        torch.nn.init.constant_(
+            self.class_subnet_output.bias, -math.log((1 - prior) / prior)
+        )
 
     @staticmethod
-    def retinanet_focal_loss(
+    def classification_loss(
         targets: List[Dict[str, Tensor]],
-        ouptuts: Dict[str, Tensor],
-        anchors: List[Tensor],
+        outputs: Dict[str, Tensor],
+        matched_idxs: List[Tensor],
     ):
+        # ---------------------------------------------------------------
+        # Calculate Classification Loss
+        # ---------------------------------------------------------------
+        loss = torch.tensor(0.0)
+        classification_loss = torch.tensor(0.0)
+        cls_preds = outputs["cls_preds"]
 
-        loss = retinanet_loss(targets, ouptuts, anchors)
-        return loss
+        for tgt, cls_pred, m_idx in zip(targets, cls_preds, matched_idxs):
+            # no matched_idxs means there were no annotations in this image
+            if m_idx.numel() == 0:
+                gt_targs = torch.zeros_like(cls_pred)
+                valid_idxs = torch.arange(cls_pred.shape[0])
+                num_foreground = torch.tensor(0.0)
+            else:
+                # determine only the foreground
+                foreground_idxs_ = m_idx >= 0
+                num_foreground = foreground_idxs_.sum()
+                gt_targs = torch.zeros_like(cls_pred)
+
+                # create the target classification
+                gt_targs[
+                    foreground_idxs_, tgt["labels"][m_idx[foreground_idxs_]]
+                ] = torch.tensor(1.0)
+
+                # find indices for which anchors should be ignored
+                valid_idxs = m_idx != IGNORE_IDX
+
+            # compute the classification loss
+            classification_loss += focal_loss(
+                cls_pred[valid_idxs], gt_targs[valid_idxs], reduction="sum"
+            ) / max(1, num_foreground)
+
+        return classification_loss / len(targets)
+
+    def forward(self, feature_maps):
+        cls_preds = []
+
+        for features in feature_maps:
+            # in: [num_batches, ..., height, width]
+            x = self.class_subnet(features)
+            x = self.class_subnet_output(x)
+            x = torch.sigmoid(x)
+            # out: [num_batches, (num_anchors * num_classes), height, width ]
+            N, _, H, W = x.shape
+            x = x.view(N, -1, self.num_classes, H, W)
+            x = x.permute(0, 3, 4, 1, 2)
+            x = x.reshape(N, -1, self.num_classes)
+            # out: [num_batches, (height*width*num_anchors), num_classes]
+            cls_preds.append(x)
+
+        # Concatenate along (height*wdth*num_anchors) dimension
+        cls_preds = torch.cat(cls_preds, dim=1)
+        return cls_preds
+
+
+class RetinaNetRegressionHead(nn.Module):
+    """
+    Box subnet for regeressing from anchor boxes to ground truth labels.
+    This subnet  applies 4 3x3 conv layers, each with `out_channels`
+    no of filters followed by a ReLU activation, followed by a 3x3
+    conv layer with (4 * num_anchors). For each anchor these 4 outputs, 
+    predict the relative offset between the abhor box & ground_truth.
+
+    Arguments:
+    ----------
+        in_channels (int) : number of input channels.
+        out_channels (out): no. of channels for each conv_layer.
+        num_anchors  (int): no. of anchors per-spatial location.
+
+    Returns:
+    --------
+        Tensor of shape [None, (height * width * num_anchors), 4] where
+        each item correspond to the relative offset between the anchor box & ground_truth per spatial location.
+    """
+
+    def __init__(self, in_channels: int, out_channels: int, num_anchors: int) -> None:
+        super(RetinaNetRegressionHead, self).__init__()
+        self.num_anchors = num_anchors
+        self.box_subnet = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, 3, padding=1, stride=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels, 3, padding=1, stride=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels, 3, padding=1, stride=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels, 3, padding=1, stride=1),
+            nn.ReLU(inplace=True),
+        )
+        self.box_subnet_output = nn.Conv2d(
+            out_channels, num_anchors * 4, 3, padding=1, stride=1
+        )
+        # Initialize the Final Layer as given in :paper: `RetinaNet`
+        torch.nn.init.normal_(self.output.weight, std=0.01)
+        torch.nn.init.zeros_(self.output.bias)
+        for layer in self.box_subnet.children():
+            if isinstance(layer, nn.Conv2d):
+                torch.nn.init.normal_(layer.weight, std=0.01)
+                torch.nn.init.zeros_(layer.bias)
+
+    @staticmethod
+    def compute_loss(
+        targets: List[Dict[str, Tensor]],
+        outputs: Dict[str, Tensor],
+        anchors: List[Tensor],
+        matched_idxs: List[Tensor],
+    ):
+        # ---------------------------------------------------------------
+        # Calculate Regression Loss
+        # ---------------------------------------------------------------
+        loss = torch.tensor(0.0)
+        bbox_preds = outputs["bbox_regression"]
+
+        for tgt, bbox, anc, idxs in zip(targets, bbox_preds, anchors, matched_idxs):
+            # no matched_idxs means there were no annotations in this image
+            if idxs.numel() == 0:
+                continue
+
+            matched_gts = tgt["boxes"][idxs.clamp(min=0)]
+            # determine only the foreground indices, ignore the rest
+            foreground_idxs_ = idxs >= 0
+            num_foreground = foreground_idxs_.sum()
+
+            # select only the foreground boxes
+            matched_gts = matched_gts[foreground_idxs_, :]
+            bbox = bbox[foreground_idxs_, :]
+            anc = anc[foreground_idxs_, :]
+
+            # compute the regression targets
+            targs = bbox_2_activ(matched_gts, anc)
+
+            # Compute loss
+            loss += smooth_l1_loss(bbox, targs, reduction="sum") / max(
+                1, num_foreground
+            )
+
+        return loss / max(1, len(targets))
+
+    def forward(self, feature_maps):
+        outputs = []
+
+        for features in feature_maps:
+            # in: [num_batches, ..., height, width]
+            x = self.box_subnet(features)
+            x = self.box_subnet_output(x)
+            # out: [num_batches, (num_anchors * num_classes), height, width ]
+            N, _, H, W = x.shape
+            x = x.view(N, -1, 4, H, W)
+            x = x.permute(0, 3, 4, 1, 2)
+            x = x.reshape(N, -1, 4)
+            # out: [num_batches, (height*width*num_anchors), num_classes]
+            outputs.append(x)
+        # Concatenate along (height*wdth*num_anchors) dimension
+        outputs = torch.cat(outputs, dim=1)
+        return outputs
