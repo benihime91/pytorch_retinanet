@@ -131,6 +131,7 @@ def matcher(
 
     match_thr = ifnone(match_thr, IOU_THRESHOLDS_FOREGROUND)
     back_thr = ifnone(back_thr, IOU_THRESHOLDS_BACKGROUND)
+    device = targets.device
 
     # Calculate IOU between given targets & anchors
     iou_vals = box_iou(targets, anchors)
@@ -139,10 +140,10 @@ def matcher(
     vals, matches = iou_vals.max(dim=0)
 
     # Assign candidate matches with low quality to negative (unassigned) values
-    # Threshold less than `back_thr` gets assigned -1 : background
-    matches[vals < back_thr] = torch.tensor(BACKGROUND_IDX, device=targets.device)
-    # Threshold between `match_thr` & `back_thr` gets assigned -2: ignore
-    matches[(vals >= back_thr) & (vals < match_thr)] = torch.tensor(
-        IGNORE_IDX, device=targets.device
-    )
+    below_low_threshold = vals < back_thr
+    between_thresholds = (vals >= back_thr) & (vals < match_thr)
+
+    matches[below_low_threshold] = torch.tensor(BACKGROUND_IDX, device=matches.device)
+    matches[between_thresholds] = torch.tensor(IGNORE_IDX, device=matches.device)
+
     return matches
