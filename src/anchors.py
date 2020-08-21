@@ -170,17 +170,17 @@ class AnchorGenerator(nn.Module):
         """
         Returns : list[Tensor] : #feature_map tensors, each is (#locations x #cell_anchors) x 4
         """
+        # List to store anchors generated for given feature maps
         anchors = []
         buffers: List[torch.Tensor] = [x[1] for x in self.cell_anchors.named_buffers()]
 
+        # Generate `anchors` over single feature map.
         for size, stride, base_anchors in zip(grid_sizes, self.strides, buffers):
-
             # Compute grid offsets from `size` and `stride`
             shift_x, shift_y = self._compute_grid_offsets(
                 size, stride, offset=self.offset, device=device
             )
             shifts = torch.stack((shift_x, shift_y, shift_x, shift_y), dim=1)
-
             # shift base anchors to get the set of anchors for a full feature map
             anchors.append(
                 (shifts.view(-1, 1, 4) + base_anchors.view(1, -1, 4)).reshape(-1, 4)

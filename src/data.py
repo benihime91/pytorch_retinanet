@@ -74,7 +74,7 @@ class CSVDataset(Dataset):
     @property
     def unique_files_idxs(self) -> List:
         return self.image_ids
-    
+
     @property
     def transformations(self) -> None:
         return print(self.tfms)
