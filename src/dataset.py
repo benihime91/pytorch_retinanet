@@ -1,13 +1,15 @@
 from typing import *
 
+import albumentations as A
 import cv2
 import pandas as pd
 import torch
-from torch.utils.data import DataLoader, Dataset
+from omegaconf import DictConfig
+from omegaconf.omegaconf import OmegaConf
+from torch.utils.data import Dataset
 
 from src.config import *
-from src.transforms import get_transformations
-from src.utilities import ifnone
+from src.utilities import ifnone, load_obj
 
 
 class CSVDataset(Dataset):
@@ -41,6 +43,7 @@ class CSVDataset(Dataset):
     def __init__(
         self,
         trn: bool,
+        transformations_cfg: DictConfig,
         directory: Optional[str] = None,
         filepath: Optional[str] = None,
         xmin_header: Optional[str] = None,
@@ -48,7 +51,6 @@ class CSVDataset(Dataset):
         xmax_header: Optional[str] = None,
         ymax_header: Optional[str] = None,
         class_header: Optional[str] = None,
-        transformations: Optional[Dict] = None,
     ) -> None:
 
         # Unpack flags
@@ -65,18 +67,30 @@ class CSVDataset(Dataset):
         self.xmax_header = ifnone(xmax_header, XMAX_HEADER)
         self.ymax_header = ifnone(ymax_header, YMAX_HEADER)
         self.cls_header = ifnone(class_header, CLASS_HEADER)
-        self.tfms_dict = ifnone(transformations, get_transformations())
 
         self.df = pd.read_csv(self.csv_pth)
         self.image_ids = self.df[self.file_header]
 
-        try:
-            if self.is_trn:
-                self.tfms = self.tfms_dict["train"]
-            else:
-                self.tfms = self.tfms_dict["valid"]
-        except ValueError:
-            print("Invalid `transformations` check `transforms.py`")
+        # Load in Hydra Config
+        cfg = transformations_cfg
+        if self.is_trn:
+            trn_tfms_list = [
+                load_obj(i["class_name"])(**i["params"])
+                for i in cfg["augmentation"]["train"]["augs"]
+            ]
+            bbox_params = OmegaConf.to_container(
+                (cfg["augmentation"]["train"]["bbox_params"])
+            )
+            self.tfms = A.Compose(trn_tfms_list, bbox_params=bbox_params)
+        else:
+            val_tfms_list = [
+                load_obj(i["class_name"])(**i["params"])
+                for i in cfg["augmentation"]["train"]["augs"]
+            ]
+            bbox_params = OmegaConf.to_container(
+                (cfg["augmentation"]["train"]["bbox_params"])
+            )
+            self.tfms = A.Compose(val_tfms_list, bbox_params=bbox_params)
 
     def __len__(self) -> int:
         return len(self.image_ids)

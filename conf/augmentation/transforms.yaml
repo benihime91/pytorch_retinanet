@@ -1,0 +1,47 @@
+# ----------------------------------------------------------------------
+# Transformations
+# ----------------------------------------------------------------------
+# Augmentations for `train Dataset`
+augmentation:
+  train:
+    augs:
+      - class_name: albumentations.Flip
+        params:
+          p: 0.6
+      - class_name: albumentations.Flip
+        params:
+          p: 0.6
+      - class_name: albumentations.Flip
+        params:
+          p: 0.6
+      - class_name: albumentations.Flip
+        params:
+          p: 0.6
+      - class_name: albumentations.RandomBrightnessContrast
+        params:
+          p: 0.6
+      - class_name: albumentations.ToFloat
+        params:
+          max_value: 255.0
+          always_apply: True
+      - class_name: albumentations.pytorch.transforms.ToTensorV2
+        params:
+          p: 1.0
+    bbox_params:
+      format: pascal_voc
+      label_fields:
+        - labels
+  # Augmentations for `valid dataset`
+  valid:
+    augs:
+      - class_name: albumentations.ToFloat
+        params:
+          max_value: 255.0
+          always_apply: True
+      - class_name: albumentations.pytorch.transforms.ToTensorV2
+        params:
+          p: 1.0
+    bbox_params:
+      format: pascal_voc
+      label_fields:
+        - labels
