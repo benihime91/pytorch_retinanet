@@ -1,14 +1,12 @@
 from typing import *
 
-import albumentations as A
 import cv2
 import pandas as pd
 import torch
-from omegaconf import DictConfig, OmegaConf
+from albumentations.core.composition import Compose
 from torch.utils.data import DataLoader, Dataset
 
-from .config import *
-from .utilities import ifnone, load_obj, collate_fn
+from .utilities import collate_fn
 
 
 class CSVDataset(Dataset):
@@ -26,70 +24,60 @@ class CSVDataset(Dataset):
 
     Arguments :
     ---------
-    1. trn          (bool)             :  Wether training data or `validation` data.
-    2. directory    (str)              :  Path to `the csv` file.
-    3. filepath     (str)              : `CSV` header for the Image File Paths.
-    4. xmin_header  (str)              : `CSV` header for the xmin values for the `annotations`.
-    5. ymin_header  (str)              : `CSV` header for the xmin values for the `annotations`.
-    6. xmax_header  (str)              : `CSV` header for the xmin values for the `annotations`.
-    7. ymax_header  (str)              : `CSV` header for the xmin values for the `annotations`.
-    8. class_header (str)              : `CSV` header for the class values (integer) for the `annotations`.
-    9. transformations (Dict[Compose]) : A dictionary contraining albumentation transforms for `train` & `valid`
-
-    >>> See `config.py` for default values.
+    1. is_train         (bool)         :  Wether training data or `validation` data.
+    2. tfms_dict    (Dict[Compose])    :  A dictionary contraining albumentation transforms for `train` & `valid`.
+    3. directory    (str)              :  Path to `the csv` file.
+    4. file_header    (str)            : `CSV` header for the Image File Paths.
+    5. xmin_header  (str)              : `CSV` header for the xmin values for the `annotations`.
+    6. ymin_header  (str)              : `CSV` header for the xmin values for the `annotations`.
+    7. xmax_header  (str)              : `CSV` header for the xmin values for the `annotations`.
+    8. ymax_header  (str)              : `CSV` header for the xmin values for the `annotations`.
+    9. class_header (str)              : `CSV` header for the class values (integer) for the `annotations`.
     """
 
     def __init__(
         self,
-        trn: bool,
-        transformations_cfg: DictConfig,
-        directory: Optional[str] = None,
-        filepath: Optional[str] = None,
-        xmin_header: Optional[str] = None,
-        ymin_header: Optional[str] = None,
-        xmax_header: Optional[str] = None,
-        ymax_header: Optional[str] = None,
-        class_header: Optional[str] = None,
+        is_train: bool,
+        tfms_dict: Dict[Compose],
+        directory: str,
+        file_header: str,
+        xmin_header: str,
+        ymin_header: str,
+        xmax_header: str,
+        ymax_header: str,
+        class_header: str,
     ) -> None:
 
         # Unpack flags
-        self.is_trn = trn
-
-        if self.is_trn:
-            self.csv_pth = ifnone(directory, TRAIN_CSV_DIR)
-        else:
-            self.csv_pth = ifnone(directory, VAL_CSV_DIR)
-
-        self.file_header = ifnone(filepath, IMG_HEADER)
-        self.xmin_header = ifnone(xmin_header, XMIN_HEADER)
-        self.ymin_header = ifnone(ymin_header, YMIN_HEADER)
-        self.xmax_header = ifnone(xmax_header, XMAX_HEADER)
-        self.ymax_header = ifnone(ymax_header, YMAX_HEADER)
-        self.cls_header = ifnone(class_header, CLASS_HEADER)
-
+        self.is_train = is_train
+        self.csv_pth = directory
+        self.file_header = file_header
+        self.xmin_header = xmin_header
+        self.ymin_header = ymin_header
+        self.xmax_header = xmax_header
+        self.ymax_header = ymax_header
+        self.cls_header = class_header
+        # Read in the DataFrmae & extract the unique ImageIds
         self.df = pd.read_csv(self.csv_pth)
         self.image_ids = self.df[self.file_header]
 
-        # Load in Hydra Config
-        cfg = transformations_cfg
+        # Instantiate train configs in self.is_train
         if self.is_trn:
-            trn_tfms_list = [
-                load_obj(i["class_name"])(**i["params"])
-                for i in cfg["augmentation"]["train"]["augs"]
-            ]
-            bbox_params = OmegaConf.to_container(
-                (cfg["augmentation"]["train"]["bbox_params"])
-            )
-            self.tfms = A.Compose(trn_tfms_list, bbox_params=bbox_params)
+            self.tfms = tfms_dict["train"]
         else:
-            val_tfms_list = [
-                load_obj(i["class_name"])(**i["params"])
-                for i in cfg["augmentation"]["train"]["augs"]
-            ]
-            bbox_params = OmegaConf.to_container(
-                (cfg["augmentation"]["train"]["bbox_params"])
-            )
-            self.tfms = A.Compose(val_tfms_list, bbox_params=bbox_params)
+            self.tfms = tfms_dict["valid"]
+
+    @property
+    def dataframe(self) -> pd.DataFrame:
+        return self.df
+
+    @property
+    def unique_files_idxs(self) -> List:
+        return self.image_ids
+    
+    @property
+    def transformations(self) -> None:
+        return print(self.tfms)
 
     def __len__(self) -> int:
         return len(self.image_ids)
@@ -99,15 +87,18 @@ class CSVDataset(Dataset):
         image_idx = self.image_ids[index]
         image = cv2.cvtColor(cv2.imread(image_idx), cv2.COLOR_BGR2RGB)
 
+        # Extract the records corresponding to the unique entry in the DataFrame
         records = self.df[self.df[self.file_header] == image_idx]
-
+        # Grab the `boxes`, `class_labels` from the `records`
         boxes = records[
             [self.xmin_header, self.ymin_header, self.xmax_header, self.ymax_header]
         ].values()
-        area = (boxes[:, 3] - boxes[:, 1]) * (boxes[:, 2] - boxes[:, 0])
         class_labels = records["target"].values.tolist()
 
-        # apply transformations
+        # calculate area of the bounding boxes
+        area = (boxes[:, 3] - boxes[:, 1]) * (boxes[:, 2] - boxes[:, 0])
+
+        # apply transformations to the `image`, `bboxes`, `labels`
         transformed = self.tfms(image=image, bboxes=boxes, class_labels=class_labels)
         image = transformed["image"]
         boxes = transformed["bboxes"]
@@ -131,23 +122,14 @@ class CSVDataset(Dataset):
         return image, target, image_idx
 
 
-def get_dataloader(
-    dataset: Optional[Dataset] = None, train: Optional[bool] = None, **kwargs
-) -> DataLoader:
+def get_dataloader(dataset, **kwargs) -> DataLoader:
     """
-    Returns a `PyTorch` DataLoader Instance for given `dataset`
+    Returns a `PyTorch` DataLoader Instance for given `Dataset`
 
     Arguments:
     ----------
-     1. dataset (Optional[Dataset]): `A torch.utils.Dataset` instance.
-                If `dataset` is None Dataset defaults to `CSVDataset`.
-                `CSV` dataset is loaded using default config flags given in `config.py`
-     2. train   (Optional[bool])   : boolean wheter train or valid.
-     3. **kwargs                   : Dataloader Flags
+     1. dataset (Dataset): `A torch.utils.Dataset` instance.
+     2. **kwargs         : Dataloader Flags
     """
-    if dataset is None:
-        assert train is not None, "if `dataset` is not given `train` must be specified"
-
-    dataset = ifnone(dataset, CSVDataset(trn=train))
     dataloader = DataLoader(dataset, collate_fn=collate_fn, **kwargs)
     return dataloader

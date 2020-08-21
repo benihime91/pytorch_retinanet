@@ -1,12 +1,14 @@
 from typing import *
 
+# TODO: cleanup
+
 # -----------------------------------------------------------------------------
 # Config definition
 # -----------------------------------------------------------------------------
 
 
 # -----------------------------------------------------------------------------
-# Input Options
+# `Generalized RCNN` Input  Transformation Options
 # -----------------------------------------------------------------------------
 MEAN: List[float] = [0.485, 0.456, 0.406]
 # `Mean values` used for input normalization.
@@ -16,27 +18,6 @@ MIN_IMAGE_SIZE: int = 600
 # `Minimum size` of the image to be rescaled before feeding it to the backbone
 MAX_IMAGE_SIZE: int = 1333
 # `Maximum` size of the image to be rescaled before feeding it to the backbone
-
-# -----------------------------------------------------------------------------
-# `Dataset` Flags
-# -----------------------------------------------------------------------------
-# Csv File Options. Each Item in the csv should `correspond` to a single annotation.
-# `targets` should be `Integers`.
-
-TRAIN_CSV_DIR: str = "train.csv"  # Specify the path to train csv here
-VAL_CSV_DIR: str = "valid.csv"  # Specify the path to the validation csv here
-# csv header pointing to the `image_paths`.
-IMG_HEADER: str = "filepath"
-# csv header pointing to the `xmin` of `annotations`.
-XMIN_HEADER: str = "xmin"
-# csv header pointing to the `ymin` of `annotations`.
-YMIN_HEADER: str = "ymin"
-# csv header pointing to the `xmax` of `annotations`.
-XMAX_HEADER: str = "xmax"
-# csv header pointing to the `ymax` of `annotations`.
-YMAX_HEADER: str = "ymax"
-# csv header pointing to the `classes` of the `bboxes`.
-CLASS_HEADER: str = "target"
 
 
 # -----------------------------------------------------------------------------

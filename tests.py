@@ -21,4 +21,3 @@ def get_config(cfg: DictConfig) -> None:
 
 
 get_config()
-
