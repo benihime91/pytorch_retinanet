@@ -81,6 +81,8 @@ class Retinanet(nn.Module):
         anchor_generator: Optional[AnchorGenerator] = None,
     ) -> None:
 
+        super(Retinanet, self).__init__()
+
         num_classes = ifnone(num_classes, NUM_CLASSES)
         backbone_kind = ifnone(backbone_kind, BACKBONE)
         prior = ifnone(prior, PRIOR)
@@ -99,8 +101,6 @@ class Retinanet(nn.Module):
 
         # The reason for the 0.05 is because that is what appears to be used by other systems as well,
         # such as faster rcnn and Detectron.
-
-        super(Retinanet, self).__init__()
         assert (
             backbone_kind in __small__ + __big__
         ), f" Expected `backbone_kind` to be one of {__small__+__big__} got {backbone_kind}"
@@ -228,4 +228,34 @@ class Retinanet(nn.Module):
                 )
 
         return final_detections
+
+    def forward(
+        self, images: List[Tensor], targets: Optional[List[Dict[str, Tensor]]] = None
+    ):
+        if self.training and targets is None:
+            raise ValueError("In training Model `targets` must be given")
+
+        # Grab the original Image sizes
+        orig_im_szs = []
+        for im in images:
+            orig_im_szs.append((im.shape[-2:][0], im.shape[-2:][1]))
+
+        images, targets = self.transform_inputs(images, targets)
+        feature_maps = self.backbone(images.tensors)
+        features = list(feature_maps.values())
+        outputs = self.retinanet_head(feature_maps)
+        anchors = self.anchor_generator(feature_maps)
+
+        losses = {}
+        detections = {}
+
+        if self.training:
+            losses = None
+            return losses
+        else:
+            detections = self.process_detections(outputs, anchors, images.image_sizes)
+            detections = self.transform_inputs.postprocess(
+                detections, images.image_sizes, orig_im_szs
+            )
+            return detections
 
