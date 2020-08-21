@@ -36,7 +36,7 @@ XMAX_HEADER: str = "xmax"
 # csv header pointing to the `ymax` of `annotations`.
 YMAX_HEADER: str = "ymax"
 # csv header pointing to the `classes` of the `bboxes`.
-CLASS_HEADER: str = "targets"
+CLASS_HEADER: str = "target"
 
 
 # -----------------------------------------------------------------------------
