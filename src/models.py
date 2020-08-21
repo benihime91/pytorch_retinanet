@@ -183,6 +183,7 @@ class Retinanet(nn.Module):
 
         scores = outputs.pop("cls_preds")
         bbox_preds = outputs.pop("bbox_preds")
+        scores = torch.sigmoid(scores)
 
         device = scores.device
         num_classes = scores.shape[-1]

@@ -176,7 +176,8 @@ class RetinaNetClassSubnet(nn.Module):
             # in: [num_batches, ..., height, width]
             x = self.class_subnet(features)
             x = self.class_subnet_output(x)
-            x = torch.sigmoid(x)
+            # NB: Do not torch.sigmoid here causes `cuda errors`.
+            # x = torch.sigmoid(x)
             # out: [num_batches, (num_anchors * num_classes), height, width ]
             N, _, H, W = x.shape
             x = x.view(N, -1, self.num_classes, H, W)

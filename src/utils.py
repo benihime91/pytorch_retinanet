@@ -140,7 +140,9 @@ def matcher(
 
     # Assign candidate matches with low quality to negative (unassigned) values
     # Threshold less than `back_thr` gets assigned -1 : background
-    matches[vals < back_thr] = torch.tensor(BACKGROUND_IDX)
+    matches[vals < back_thr] = torch.tensor(BACKGROUND_IDX, device=targets.device)
     # Threshold between `match_thr` & `back_thr` gets assigned -2: ignore
-    matches[(vals >= back_thr) & (vals < match_thr)] = torch.tensor(IGNORE_IDX)
+    matches[(vals >= back_thr) & (vals < match_thr)] = torch.tensor(
+        IGNORE_IDX, device=targets.device
+    )
     return matches
