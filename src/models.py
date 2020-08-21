@@ -8,7 +8,7 @@ from .anchors import AnchorGenerator
 from .config import *
 from .layers import FPN, RetinaNetHead, get_backbone
 from .utilities import ifnone
-from .utils import activ_2_bbox
+from .utils import activ_2_bbox, matcher
 
 __small__ = ["resnet18", "resnet34"]
 __big__ = ["resnet50", "resnet101", "resnet101", "resnet152"]
@@ -153,6 +153,22 @@ class Retinanet(nn.Module):
                 self.backbone.backbone.layer4[2].conv3.out_channels,
             ]
         return fpn_szs
+
+    def compute_loss(
+        self,
+        targets: List[Dict[str, Tensor]],
+        outputs: Dict[str, Tensor],
+        anchors: List[Tensor],
+    ) -> Dict[str, Tensor]:
+
+        matched_idxs = []
+        for ancs, targs in zip(anchors, targets):
+            if targs["boxes"].numel() == 0:
+                matched_idxs.append(torch.empty((0,), dtype=torch.int32))
+                continue
+            matched_idxs.append(matcher(targs["boxes"], ancs))
+
+        return self.retinanet_head.compute_loss(targets, outputs, anchors, matched_idxs)
 
     def process_detections(
         self,

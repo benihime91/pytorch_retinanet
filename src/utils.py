@@ -134,11 +134,13 @@ def matcher(
 
     # Calculate IOU between given targets & anchors
     iou_vals = box_iou(targets, anchors)
+
     # Grab the best ground_truth overlap
-    vals, idxs = iou_vals.max(dim=0)
+    vals, matches = iou_vals.max(dim=0)
+
     # Assign candidate matches with low quality to negative (unassigned) values
     # Threshold less than `back_thr` gets assigned -1 : background
-    idxs[vals < back_thr] = torch.tensor(BACKGROUND_IDX)
+    matches[vals < back_thr] = torch.tensor(BACKGROUND_IDX)
     # Threshold between `match_thr` & `back_thr` gets assigned -2: ignore
-    idxs[(vals >= back_thr) & (vals < match_thr)] = torch.tensor(IGNORE_IDX)
-    return idxs
+    matches[(vals >= back_thr) & (vals < match_thr)] = torch.tensor(IGNORE_IDX)
+    return matches
