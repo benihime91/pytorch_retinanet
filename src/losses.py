@@ -172,7 +172,7 @@ class RetinaNetLosses(nn.Module):
                 ] = torch.tensor(1.0)
 
                 # find indices for which anchors should be ignored
-                valid_idxs_per_image = matched_idxs_per_image != self.BETWEEN_THRESHOLDS
+                valid_idxs_per_image = matched_idxs_per_image != IGNORE_IDX
 
             # compute the classification loss
             loss += focal_loss(
