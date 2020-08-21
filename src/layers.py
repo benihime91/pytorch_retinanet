@@ -1,12 +1,11 @@
 import math
-from typing import *
 import torch
 from torch import nn
 import torch.nn.functional as F
 from torch.functional import Tensor
+from typing import *
 from .config import *
-from .losses import focal_loss, smooth_l1_loss
-from .utils import bbox_2_activ
+from .losses import classification_loss, regression_loss
 
 
 class FPN(nn.Module):
@@ -85,21 +84,17 @@ class RetinaNetHead(nn.Module):
         prior: float,
     ) -> None:
         super(RetinaNetHead, self).__init__()
-        self.classification_head = RetinaNetClassificationHead(
+        self.classification_head = RetinaNetClassSubnet(
             in_channels, out_channels, num_anchors, num_classes, prior
         )
-        self.regression_head = RetinaNetRegressionHead(
+        self.regression_head = RetinaNetBoxSubnet(
             in_channels, out_channels, num_anchors
         )
 
     def compute_loss(self, targets, outputs, anchors, matched_idxs):
         output_dict = {
-            "classification_loss": self.classification_head.compute_loss(
-                targets, outputs, matched_idxs
-            ),
-            "bbox_regression": self.regression_head.compute_loss(
-                targets, outputs, anchors
-            ),
+            "classification_loss": classification_loss(targets, outputs, matched_idxs),
+            "bbox_regression": regression_loss(targets, outputs, anchors),
         }
         return output_dict
 
@@ -111,7 +106,7 @@ class RetinaNetHead(nn.Module):
         return output_dict
 
 
-class RetinaNetClassificationHead(nn.Module):
+class RetinaNetClassSubnet(nn.Module):
     """
     Classification Head for use in RetinaNet.
     This subnet  applies 4 3x3 conv layers, each with `out_channels`
@@ -142,7 +137,7 @@ class RetinaNetClassificationHead(nn.Module):
         num_classes: int,
         prior: float,
     ) -> None:
-        super(RetinaNetClassificationHead).__init__()
+        super(RetinaNetClassSubnet).__init__()
         self.num_classes = num_classes
         self.num_anchors = num_anchors
         self.class_subnet = nn.Sequential(
@@ -163,46 +158,6 @@ class RetinaNetClassificationHead(nn.Module):
         torch.nn.init.constant_(
             self.class_subnet_output.bias, -math.log((1 - prior) / prior)
         )
-
-    @staticmethod
-    def classification_loss(
-        targets: List[Dict[str, Tensor]],
-        outputs: Dict[str, Tensor],
-        matched_idxs: List[Tensor],
-    ):
-        # ---------------------------------------------------------------
-        # Calculate Classification Loss
-        # ---------------------------------------------------------------
-        loss = torch.tensor(0.0)
-        classification_loss = torch.tensor(0.0)
-        cls_preds = outputs["cls_preds"]
-
-        for tgt, cls_pred, m_idx in zip(targets, cls_preds, matched_idxs):
-            # no matched_idxs means there were no annotations in this image
-            if m_idx.numel() == 0:
-                gt_targs = torch.zeros_like(cls_pred)
-                valid_idxs = torch.arange(cls_pred.shape[0])
-                num_foreground = torch.tensor(0.0)
-            else:
-                # determine only the foreground
-                foreground_idxs_ = m_idx >= 0
-                num_foreground = foreground_idxs_.sum()
-                gt_targs = torch.zeros_like(cls_pred)
-
-                # create the target classification
-                gt_targs[
-                    foreground_idxs_, tgt["labels"][m_idx[foreground_idxs_]]
-                ] = torch.tensor(1.0)
-
-                # find indices for which anchors should be ignored
-                valid_idxs = m_idx != IGNORE_IDX
-
-            # compute the classification loss
-            classification_loss += focal_loss(
-                cls_pred[valid_idxs], gt_targs[valid_idxs], reduction="sum"
-            ) / max(1, num_foreground)
-
-        return classification_loss / len(targets)
 
     def forward(self, feature_maps):
         cls_preds = []
@@ -225,7 +180,7 @@ class RetinaNetClassificationHead(nn.Module):
         return cls_preds
 
 
-class RetinaNetRegressionHead(nn.Module):
+class RetinaNetBoxSubnet(nn.Module):
     """
     Box subnet for regeressing from anchor boxes to ground truth labels.
     This subnet  applies 4 3x3 conv layers, each with `out_channels`
@@ -246,7 +201,7 @@ class RetinaNetRegressionHead(nn.Module):
     """
 
     def __init__(self, in_channels: int, out_channels: int, num_anchors: int) -> None:
-        super(RetinaNetRegressionHead, self).__init__()
+        super(RetinaNetBoxSubnet, self).__init__()
         self.num_anchors = num_anchors
         self.box_subnet = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, 3, padding=1, stride=1),
@@ -268,44 +223,6 @@ class RetinaNetRegressionHead(nn.Module):
             if isinstance(layer, nn.Conv2d):
                 torch.nn.init.normal_(layer.weight, std=0.01)
                 torch.nn.init.zeros_(layer.bias)
-
-    @staticmethod
-    def compute_loss(
-        targets: List[Dict[str, Tensor]],
-        outputs: Dict[str, Tensor],
-        anchors: List[Tensor],
-        matched_idxs: List[Tensor],
-    ):
-        # ---------------------------------------------------------------
-        # Calculate Regression Loss
-        # ---------------------------------------------------------------
-        loss = torch.tensor(0.0)
-        bbox_preds = outputs["bbox_regression"]
-
-        for tgt, bbox, anc, idxs in zip(targets, bbox_preds, anchors, matched_idxs):
-            # no matched_idxs means there were no annotations in this image
-            if idxs.numel() == 0:
-                continue
-
-            matched_gts = tgt["boxes"][idxs.clamp(min=0)]
-            # determine only the foreground indices, ignore the rest
-            foreground_idxs_ = idxs >= 0
-            num_foreground = foreground_idxs_.sum()
-
-            # select only the foreground boxes
-            matched_gts = matched_gts[foreground_idxs_, :]
-            bbox = bbox[foreground_idxs_, :]
-            anc = anc[foreground_idxs_, :]
-
-            # compute the regression targets
-            targs = bbox_2_activ(matched_gts, anc)
-
-            # Compute loss
-            loss += smooth_l1_loss(bbox, targs, reduction="sum") / max(
-                1, num_foreground
-            )
-
-        return loss / max(1, len(targets))
 
     def forward(self, feature_maps):
         outputs = []

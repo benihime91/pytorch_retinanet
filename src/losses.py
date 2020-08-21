@@ -1,7 +1,9 @@
 from typing import *
+import torch
 import torch.nn.functional as F
 from torch.functional import Tensor
 from .config import *
+from .utils import bbox_2_activ
 
 
 def smooth_l1_loss(inp: Tensor, targs: Tensor, reduction: str = "mean") -> Tensor:
@@ -53,3 +55,78 @@ def focal_loss(
         loss = loss.sum()
 
     return loss
+
+
+def classification_loss(
+    targets: List[Dict[str, Tensor]],
+    outputs: Dict[str, Tensor],
+    matched_idxs: List[Tensor],
+) -> Tensor:
+    # ---------------------------------------------------------------
+    # Calculate Classification Loss for `ClassSubnet` of  `RetinaNet`
+    # ---------------------------------------------------------------
+    loss = torch.tensor(0.0)
+    classification_loss = torch.tensor(0.0)
+    cls_preds = outputs["cls_preds"]
+
+    for tgt, cls_pred, m_idx in zip(targets, cls_preds, matched_idxs):
+        # no matched_idxs means there were no annotations in this image
+        if m_idx.numel() == 0:
+            gt_targs = torch.zeros_like(cls_pred)
+            valid_idxs = torch.arange(cls_pred.shape[0])
+            num_foreground = torch.tensor(0.0)
+        else:
+            # determine only the foreground
+            foreground_idxs_ = m_idx >= 0
+            num_foreground = foreground_idxs_.sum()
+            gt_targs = torch.zeros_like(cls_pred)
+
+            # create the target classification
+            gt_targs[
+                foreground_idxs_, tgt["labels"][m_idx[foreground_idxs_]]
+            ] = torch.tensor(1.0)
+            # find indices for which anchors should be ignored
+            valid_idxs = m_idx != IGNORE_IDX
+
+        # compute the classification loss
+        classification_loss += focal_loss(
+            cls_pred[valid_idxs], gt_targs[valid_idxs], reduction="sum"
+        ) / max(1, num_foreground)
+
+    return classification_loss / len(targets)
+
+
+def regression_loss(
+    targets: List[Dict[str, Tensor]],
+    outputs: Dict[str, Tensor],
+    anchors: List[Tensor],
+    matched_idxs: List[Tensor],
+) -> Tensor:
+    # ---------------------------------------------------------------
+    # Calculate Regression Loss
+    # ---------------------------------------------------------------
+    loss = torch.tensor(0.0)
+    bbox_preds = outputs["bbox_regression"]
+
+    for tgt, bbox, anc, idxs in zip(targets, bbox_preds, anchors, matched_idxs):
+        # no matched_idxs means there were no annotations in this image
+        if idxs.numel() == 0:
+            continue
+
+        matched_gts = tgt["boxes"][idxs.clamp(min=0)]
+        # determine only the foreground indices, ignore the rest
+        foreground_idxs_ = idxs >= 0
+        num_foreground = foreground_idxs_.sum()
+
+        # select only the foreground boxes
+        matched_gts = matched_gts[foreground_idxs_, :]
+        bbox = bbox[foreground_idxs_, :]
+        anc = anc[foreground_idxs_, :]
+
+        # compute the regression targets
+        targs = bbox_2_activ(matched_gts, anc)
+
+        # Compute loss
+        loss += smooth_l1_loss(bbox, targs, reduction="sum") / max(1, num_foreground)
+
+    return loss / max(1, len(targets))

@@ -87,12 +87,3 @@ def get_backbone(
         kind=kind, hook_fn=hook_outputs, pretrained=pretrained, freeze_bn=freeze_bn
     )
     return backbone
-
-
-# if __name__ == '__main__':
-#     import torch
-#     m = get_backbone()
-#     z = torch.rand([1, 3, 64, 64])
-#     output = m(z)
-#     print(output)
-#     print([o.shape for o in output])
