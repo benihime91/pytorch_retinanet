@@ -22,8 +22,10 @@ funcs = {
 
 class EmptyLayer(nn.Module):
     " PlaceHolder for `AvgPool` and `FC Layer` "
+
     def __init__(self) -> None:
         super(EmptyLayer, self).__init__()
+
     def forward(self, xb):
         return xb
 

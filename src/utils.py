@@ -15,7 +15,7 @@ def bbox_2_activ(ground_truth_boxes: Tensor, anchors: Tensor) -> Tensor:
     """
     if anchors.device != ground_truth_boxes.device:
         anchors.to(ground_truth_boxes.device)
-    
+
     # Unpack Elements
     anchors_x1 = anchors[:, 0].unsqueeze(1)
     anchors_y1 = anchors[:, 1].unsqueeze(1)
@@ -48,7 +48,9 @@ def bbox_2_activ(ground_truth_boxes: Tensor, anchors: Tensor) -> Tensor:
     return targets
 
 
-def activ_2_bbox(activations: Tensor, anchors: Tensor, clip_activ: float = math.log(1000.0 / 16)) -> Tensor:
+def activ_2_bbox(
+    activations: Tensor, anchors: Tensor, clip_activ: float = math.log(1000.0 / 16)
+) -> Tensor:
     "Converts the `activations` of the `model` to bounding boxes."
 
     # Gather in the same device
@@ -78,13 +80,27 @@ def activ_2_bbox(activations: Tensor, anchors: Tensor, clip_activ: float = math.
     pred_h = torch.exp(dh) * h[:, None]
 
     # Convert bbox shape from xywh to x1y1x2y2
-    pred_boxes1 = (pred_ctr_x - torch.tensor(0.5, dtype=pred_ctr_x.dtype, device=pred_w.device) * pred_w)
-    pred_boxes2 = (pred_ctr_y - torch.tensor(0.5, dtype=pred_ctr_y.dtype, device=pred_h.device) * pred_h)
-    pred_boxes3 = (pred_ctr_x + torch.tensor(0.5, dtype=pred_ctr_x.dtype, device=pred_w.device) * pred_w)
-    pred_boxes4 = (pred_ctr_y + torch.tensor(0.5, dtype=pred_ctr_y.dtype, device=pred_h.device) * pred_h)
+    pred_boxes1 = (
+        pred_ctr_x
+        - torch.tensor(0.5, dtype=pred_ctr_x.dtype, device=pred_w.device) * pred_w
+    )
+    pred_boxes2 = (
+        pred_ctr_y
+        - torch.tensor(0.5, dtype=pred_ctr_y.dtype, device=pred_h.device) * pred_h
+    )
+    pred_boxes3 = (
+        pred_ctr_x
+        + torch.tensor(0.5, dtype=pred_ctr_x.dtype, device=pred_w.device) * pred_w
+    )
+    pred_boxes4 = (
+        pred_ctr_y
+        + torch.tensor(0.5, dtype=pred_ctr_y.dtype, device=pred_h.device) * pred_h
+    )
 
     # Stack the co-ordinates to the bbox co-ordinates.
-    pred_boxes = torch.stack((pred_boxes1, pred_boxes2, pred_boxes3, pred_boxes4), dim=2).flatten(1)
+    pred_boxes = torch.stack(
+        (pred_boxes1, pred_boxes2, pred_boxes3, pred_boxes4), dim=2
+    ).flatten(1)
     return pred_boxes
 
 
@@ -123,7 +139,9 @@ def matcher(
     return idxs
 
 
-def retinanet_loss(targets: List[Dict[str, Tensor]], outputs: Dict[str, Tensor], anchors: List[Tensor]) -> Dict[str, Tensor]:
+def retinanet_loss(
+    targets: List[Dict[str, Tensor]], outputs: Dict[str, Tensor], anchors: List[Tensor]
+) -> Dict[str, Tensor]:
     """
     Loss for the `classification subnet` & `regression subnet` of `RetinaNet`
     """
@@ -132,11 +150,10 @@ def retinanet_loss(targets: List[Dict[str, Tensor]], outputs: Dict[str, Tensor],
     # ---------------------------------------------------------------------
     matched_idxs = []
     for ancs, targs in zip(anchors, targets):
-        if targs['boxes'].numel() == 0:
+        if targs["boxes"].numel() == 0:
             matched_idxs.append(torch.empty((0,), dtype=torch.int32))
             continue
         matched_idxs.append(bbox_2_activ(targs["boxes"], ancs))
-
 
     # ---------------------------------------------------------------------
     # Instantiate `vars`
@@ -166,7 +183,10 @@ def retinanet_loss(targets: List[Dict[str, Tensor]], outputs: Dict[str, Tensor],
             # Create the classification targets
             # one_hot encode the classification targets
             gt_class_target = torch.zeros_like(cls_pred)
-            gt_class_target = [class_mask,cls_tgt["labels"][matches[class_mask]],] = torch.tensor(1.0)
+            gt_class_target = [
+                class_mask,
+                cls_tgt["labels"][matches[class_mask]],
+            ] = torch.tensor(1.0)
             # Find Indices where anchors should be ignored
             valid_idxs_per_image = matches != IGNORE_IDX
 
@@ -174,13 +194,17 @@ def retinanet_loss(targets: List[Dict[str, Tensor]], outputs: Dict[str, Tensor],
         valid_gt_class_target = gt_class_target[valid_idxs_per_image]
 
         # Compute Focal Loss
-        classification_loss += focal_loss(valid_cls_logits, valid_gt_class_target, reduction="sum") / max(1, num_foregrounds)
+        classification_loss += focal_loss(
+            valid_cls_logits, valid_gt_class_target, reduction="sum"
+        ) / max(1, num_foregrounds)
 
     # ---------------------------------------------------------------------
     # Calculate Regression Loss
     # ---------------------------------------------------------------------
     bbox_regress_loss = torch.tensor(0.0)
-    for bbox_tgt, bbox_pred, ancs, matches in zip(targets, bbox_regression, anchors, matched_idxs):
+    for bbox_tgt, bbox_pred, ancs, matches in zip(
+        targets, bbox_regression, anchors, matched_idxs
+    ):
         # no matched_idxs means there were no annotations in this image
         if matches.numel() == 0:
             continue
@@ -197,10 +221,13 @@ def retinanet_loss(targets: List[Dict[str, Tensor]], outputs: Dict[str, Tensor],
         # Encode the `gt_bboxes` to `activations`
         target_regression = bbox_2_activ(matched_gt_boxes_per_image, ancs_per_image)
         # compute the loss
-        bbox_regress_loss += smooth_l1_loss(bbox_pred_per_image, target_regression, reduction="sum") / max(1, num_foreground)
+        bbox_regress_loss += smooth_l1_loss(
+            bbox_pred_per_image, target_regression, reduction="sum"
+        ) / max(1, num_foreground)
 
         loss_dict = {
-        "classification_loss": classification_loss / max(1, len(targets)),
-        "bbox_regression_loss": bbox_regress_loss / max(1, len(targets)),}
+            "classification_loss": classification_loss / max(1, len(targets)),
+            "bbox_regression_loss": bbox_regress_loss / max(1, len(targets)),
+        }
 
         return loss_dict
