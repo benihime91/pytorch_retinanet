@@ -5,6 +5,7 @@ from typing import *
 import torch
 from torch import device, nn
 from torch.functional import Tensor
+from torchvision.models.detection.image_list import ImageList
 
 from .config import *
 from .utils import ifnone
@@ -189,11 +190,16 @@ class AnchorGenerator(nn.Module):
 
         return anchors
 
-    def forward(self, images: List[Tensor], feature_maps: List[Tensor]) -> List[Tensor]:
+    def forward(self, images: ImageList, feature_maps: List[Tensor]) -> List[Tensor]:
         """
         Generate `Anchors` for each `Feature Map`.
 
         Args:
+          2. images  (ImageList)    : Structure that holds a list of images (of possibly
+                                      varying sizes) as a single tensor.
+                                      This works by padding the images to the same size,
+                                      and storing in a field the original sizes of each image.
+
           1. features (list[Tensor]): list of backbone feature maps on which to generate anchors.
 
         Returns:
@@ -207,9 +213,12 @@ class AnchorGenerator(nn.Module):
         device = feature_maps[0].device
         anchors = []
         # calculate achors for all Images
-        for _ in images:
-            # Generate anchors for all Features Map
+        for i, (_, _) in enumerate(images.image_sizes):
+            # Generate anchors for all Features maps for given images
             ancs = self.grid_anchors(grid_sizes, device=device)
             anchors.append(ancs)
 
         return [torch.cat(anchors_per_image) for anchors_per_image in anchors]
+
+
+ImageList()
