@@ -220,6 +220,3 @@ class AnchorGenerator(nn.Module):
             anchors.append(ancs)
 
         return [torch.cat(anchors_per_image) for anchors_per_image in anchors]
-
-
-ImageList()
