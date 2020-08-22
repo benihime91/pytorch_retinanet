@@ -100,10 +100,7 @@ class RetinaNetHead(nn.Module):
     ) -> Dict[str, Tensor]:
 
         # Calculate Losses
-        output_dict = {
-            "classification_loss": self.losses.class_loss(targets, outputs, anchors),
-            "bbox_regression": self.losses.bbox_loss(targets, outputs, anchors),
-        }
+        output_dict = self.losses(targets, outputs, anchors)
         return output_dict
 
     def forward(self, xb: Tensor) -> Dict[str, Tensor]:
