@@ -1,7 +1,7 @@
+pytorch-lightning
+opencv-python
+git+https://github.com/albumentations-team/albumentations
 pycocotools
 matplotlib
-opencv-python
 bounding-box
-albumentations==0.4.6
-pytorch-lightning
 hydra-core
