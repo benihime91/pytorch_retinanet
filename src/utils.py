@@ -149,9 +149,7 @@ def activ_2_bbox(
     return pred_boxes
 
 
-def matcher(
-    anchors: Tensor, targets: Tensor, match_thr: float = None, back_thr: float = None
-) -> Tensor:
+def matcher(anchors: Tensor, targets: Tensor, match_thr: float = None, back_thr: float = None):
     """
     Match `anchors` to targets. -1 is match to background, -2 is ignore.
     """
@@ -165,14 +163,13 @@ def matcher(
     match_thr = ifnone(match_thr, IOU_THRESHOLDS_FOREGROUND)
     back_thr = ifnone(back_thr, IOU_THRESHOLDS_BACKGROUND)
 
-    assert (
-        match_thr > back_thr
-    ), f"`match_thr` should be > than `back_thr` got {match_thr} and {back_thr}"
+    assert (match_thr > back_thr)
 
-    matches = anchors.new(anchors.size(0)).zero_().long() - IGNORE_IDX
+    matches = anchors.new(anchors.size(0)).zero_().long() + IGNORE_IDX
 
     if targets.numel() == 0:
         return matches
+
     # Calculate IOU between given targets & anchors
     iou_vals = compute_IOU(anchors, targets)
     # Grab the best ground_truth overlap
