@@ -203,8 +203,9 @@ class AnchorGenerator(nn.Module):
           1. features (list[Tensor]): list of backbone feature maps on which to generate anchors.
 
         Returns:
-          list[Tensor]: a list of Tensors containing all the anchors for each feature map for all Images.
-                        (i.e. the cell anchors repeated over all locations in the feature map).
+          list[Tensor]: a list of Tensors of len `num_images` containing all the anchors for 
+                        each feature map (i.e. the cell anchors repeated over all locations in
+                        the feature map).
                         The number of anchors of each feature map is Hi x Wi x num_cell_anchors,
                         where Hi, Wi are Height & Width of the Feature Map respectively.
         """
@@ -214,7 +215,7 @@ class AnchorGenerator(nn.Module):
         anchors = []
         # calculate achors for all Images
         for i, (_, _) in enumerate(images.image_sizes):
-            # Generate anchors for all Features maps for given images
+            # Generate anchors for all Features maps for given image
             ancs = self.grid_anchors(grid_sizes, device=device)
             anchors.append(ancs)
 
