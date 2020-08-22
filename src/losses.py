@@ -28,6 +28,8 @@ class RetinaNetLosses(nn.Module):
 
     def calc_loss(self,anchors, clas_pred, bbox_pred, clas_tgt, bbox_tgt):
         """Calculate loss for class & box subnet of retinanet"""
+        i = torch.min(torch.nonzero(clas_tgt))
+        clas_tgt = clas_tgt[i:]-1
         # Match boxes with anchors to get `background`, `ignore` and `foregoround` positions
         matches = matcher(anchors, bbox_tgt)
         # create filtering mask to filter `background` and `ignore` classes from the bboxes
