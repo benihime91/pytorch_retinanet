@@ -167,14 +167,6 @@ class Retinanet(nn.Module):
         anchors: List[Tensor],
     ) -> Dict[str, Tensor]:
 
-        # matched_idxs = []
-        # for ancs, targs in zip(anchors, targets):
-        #     if targs["boxes"].numel() == 0:
-        #         matched_idxs.append(torch.empty((0,), dtype=torch.int32))
-        #         continue
-
-        #     matched_idxs.append(matcher(targs["boxes"], ancs))
-
         return self.retinanet_head.compute_loss(targets, outputs, anchors)
 
     def process_detections(
@@ -278,7 +270,7 @@ class Retinanet(nn.Module):
         fpn_outputs = self.fpn(feature_maps)
         outputs = self.retinanet_head(fpn_outputs)
 
-        anchors = self.anchor_generator(fpn_outputs)
+        anchors = self.anchor_generator(images, fpn_outputs)
 
         losses = {}
         detections = torch.jit.annotate(List[Dict[str, Tensor]], [])
