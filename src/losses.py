@@ -27,7 +27,6 @@ class RetinaNetLosses(nn.Module):
         return clas_loss
 
     def calc_loss(self,anchors, clas_pred, bbox_pred, clas_tgt, bbox_tgt):
-
         """Calculate loss for class & box subnet of retinanet"""
         # Match boxes with anchors to get `background`, `ignore` and `foregoround` positions
         matches = matcher(anchors, bbox_tgt)
