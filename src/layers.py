@@ -180,8 +180,7 @@ class RetinaNetClassSubnet(nn.Module):
             # out: [num_batches, (num_anchors * num_classes), height, width ]
             N, _, H, W = x.shape
             x = x.view(N, -1, self.num_classes, H, W)
-            x = x.permute(0, 3, 4, 1, 2)
-            x = x.reshape(N, -1, self.num_classes)
+            x = x.permute(0, 3, 4, 1, 2).contiguous().view(N, -1, self.num_classes)
             # out: [num_batches, (height*width*num_anchors), num_classes]
             cls_preds.append(x)
 
@@ -247,8 +246,7 @@ class RetinaNetBoxSubnet(nn.Module):
             # out: [num_batches, (num_anchors * num_classes), height, width ]
             N, _, H, W = x.shape
             x = x.view(N, -1, 4, H, W)
-            x = x.permute(0, 3, 4, 1, 2)
-            x = x.reshape(N, -1, 4)
+            x = x.permute(0, 3, 4, 1, 2).contiguous().view(N, -1, 4)
             # out: [num_batches, (height*width*num_anchors), num_classes]
             bbox_preds.append(x)
         # Concatenate along (height*wdth*num_anchors) dimension

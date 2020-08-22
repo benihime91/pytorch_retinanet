@@ -100,9 +100,6 @@ class RetinaNetLosses(nn.Module):
 
         return loss
 
-
-
-
 def encode_class(idxs, n_classes):
     "converts idxs into one-hot vector"
     target = idxs.new_zeros(len(idxs), n_classes).float()

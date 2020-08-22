@@ -91,9 +91,7 @@ class Retinanet(nn.Module):
         pretrained = ifnone(pretrained, PRETRAINED_BACKBONE)
         nms_thres = ifnone(nms_thres, NMS_THRES)
         score_thres = ifnone(score_thres, SCORE_THRES)
-        max_detections_per_images = ifnone(
-            max_detections_per_images, MAX_DETECTIONS_PER_IMAGE
-        )
+        max_detections_per_images = ifnone(max_detections_per_images, MAX_DETECTIONS_PER_IMAGE)
         freeze_bn = ifnone(freeze_bn, FREEZE_BN)
         min_size = ifnone(min_size, MIN_IMAGE_SIZE)
         max_size = ifnone(max_size, MAX_IMAGE_SIZE)
@@ -112,21 +110,14 @@ class Retinanet(nn.Module):
         # ------------------------------------------------------
 
         # # Instantiate `GeneralizedRCNNTransform` to resize inputs
-        self.transform_inputs = GeneralizedRCNNTransform(
-            min_size, max_size, image_mean, image_std
-        )
+        self.transform_inputs = GeneralizedRCNNTransform(min_size, max_size, image_mean, image_std)
         # Get the back bone of the Model
         self.backbone_kind = backbone_kind
-        self.backbone = get_backbone(
-            self.backbone_kind, pretrained, freeze_bn=freeze_bn
-        )
-
+        self.backbone = get_backbone(self.backbone_kind, pretrained, freeze_bn=freeze_bn)
         # # Grab the backbone output channels
         self.fpn_szs = self._get_backbone_ouputs()
         # # Instantiate the `FPN`
-        self.fpn = FPN(
-            self.fpn_szs[0], self.fpn_szs[1], self.fpn_szs[2], out_channels=256
-        )
+        self.fpn = FPN(self.fpn_szs[0], self.fpn_szs[1], self.fpn_szs[2], out_channels=256)
 
         # # Instantiate anchor Generator
         self.anchor_generator = anchor_generator
@@ -176,12 +167,12 @@ class Retinanet(nn.Module):
         im_szs: List[Tuple[int, int]],
     ) -> List[Dict[str, Tensor]]:
 
-        scores = outputs.pop("cls_preds")
+        class_logits = outputs.pop("cls_preds")
         bbox_preds = outputs.pop("bbox_preds")
-        scores = torch.sigmoid(scores)
+        scores = torch.sigmoid(class_logits)
 
-        device = scores.device
-        num_classes = scores.shape[-1]
+        device = class_logits.device
+        num_classes = class_logits.shape[-1]
 
         # create labels for each score
         labels = torch.arange(num_classes, device=device)
@@ -281,11 +272,9 @@ class Retinanet(nn.Module):
         else:
             # compute the detections
             with torch.no_grad():
-                detections = self.process_detections(
-                    outputs, anchors, images.image_sizes
-                )
-                detections = self.transform_inputs.postprocess(
-                    detections, images.image_sizes, orig_im_szs
-                )
+
+                detections = self.process_detections(outputs, anchors, images.image_sizes)
+
+                detections = self.transform_inputs.postprocess(detections, images.image_sizes, orig_im_szs)
 
         return self._get_outputs(losses, detections)
