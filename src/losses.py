@@ -1,8 +1,10 @@
 from typing import *
+
 import torch
 import torch.nn.functional as F
 from torch import nn
 from torch.functional import Tensor
+
 from .config import *
 from .utils import bbox_2_activ, matcher
 
@@ -19,7 +21,9 @@ def focal_loss(inputs: Tensor, targets: Tensor,) -> Tensor:
     alphas = (1 - targets) * alpha + targets * (1 - alpha)
     weights.pow_(gamma).mul_(alphas)
 
-    clas_loss = F.binary_cross_entropy_with_logits(inputs, targets, weights, reduction="sum")
+    clas_loss = F.binary_cross_entropy_with_logits(
+        inputs, targets, weights, reduction="sum"
+    )
 
     return clas_loss
 
@@ -44,7 +48,7 @@ class RetinaNetLosses(nn.Module):
         bbox_pred: Tensor,
         clas_tgt: Tensor,
         bbox_tgt: Tensor,
-    )->Tuple[Tensor, Tensor]:
+    ) -> Tuple[Tensor, Tensor]:
 
         """Calculate loss for class & box subnet of retinanet"""
         # Match boxes with anchors to get `background`, `ignore` and `foregoround` positions
@@ -72,7 +76,9 @@ class RetinaNetLosses(nn.Module):
         clas_tgt = clas_tgt[matches[clas_mask]]
         # one hot the class targets
         clas_tgt = self._encode_class(clas_tgt)
-        clas_loss = focal_loss(clas_pred, clas_tgt) / torch.clamp(bbox_mask.sum(), min=1.0)
+        clas_loss = focal_loss(clas_pred, clas_tgt) / torch.clamp(
+            bbox_mask.sum(), min=1.0
+        )
         return clas_loss, bb_loss
 
     def forward(
@@ -88,11 +94,15 @@ class RetinaNetLosses(nn.Module):
         loss["classification_loss"] = []
         loss["regression_loss"] = []
 
-        for cls_pred, bb_pred, targs, ancs in zip(clas_preds, bbox_preds, targets, anchors):
+        for cls_pred, bb_pred, targs, ancs in zip(
+            clas_preds, bbox_preds, targets, anchors
+        ):
             # Extract the Labels & boxes from the targets
             class_targs, bbox_targs = targs["labels"], targs["boxes"]
             # Compute loss
-            clas_loss, bb_loss = self.calc_loss(ancs, cls_pred, bb_pred, class_targs, bbox_targs)
+            clas_loss, bb_loss = self.calc_loss(
+                ancs, cls_pred, bb_pred, class_targs, bbox_targs
+            )
             # Append Losses
             loss["classification_loss"].append(clas_loss)
             loss["regression_loss"].append(bb_loss)

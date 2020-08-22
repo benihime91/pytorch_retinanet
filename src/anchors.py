@@ -1,11 +1,13 @@
 # Modified From : https://github.com/facebookresearch/detectron2/blob/master/detectron2/modeling/anchor_generator.py
 import math
 from typing import *
+
 import torch
 from torch import device, nn
 from torch.functional import Tensor
+
 from .config import *
-from .utilities import ifnone
+from .utils import ifnone
 
 
 class BufferList(nn.Module):

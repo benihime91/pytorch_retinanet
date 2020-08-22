@@ -1,15 +1,16 @@
 from typing import *
-from .config import *
+
 import torch
 import torch.nn as nn
 from torch.functional import Tensor
 from torchvision.models.detection.transform import GeneralizedRCNNTransform
 from torchvision.ops.boxes import clip_boxes_to_image, nms, remove_small_boxes
+
 from .anchors import AnchorGenerator
-from .layers import FPN, RetinaNetHead
 from .backbone import get_backbone
-from .utilities import ifnone
-from .utils import activ_2_bbox, matcher
+from .config import *
+from .layers import FPN, RetinaNetHead
+from .utils import activ_2_bbox, ifnone
 
 __small__ = ["resnet18", "resnet34"]
 __big__ = ["resnet50", "resnet101", "resnet101", "resnet152"]

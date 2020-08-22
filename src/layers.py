@@ -1,9 +1,11 @@
 import math
-import torch
-from torch import nn
-import torch.nn.functional as F
-from torch.functional import Tensor
 from typing import *
+
+import torch
+import torch.nn.functional as F
+from torch import nn
+from torch.functional import Tensor
+
 from .config import *
 from .losses import RetinaNetLosses
 
