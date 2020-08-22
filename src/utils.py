@@ -128,26 +128,15 @@ def matcher(
     # - if the maximum overlap is greater than 0.5, we match the anchor box to that ground truth object.
     # The classifier's target will be the category of that target.
     # - if the maximum overlap is between 0.4 and 0.5, we ignore that anchor in our loss computation.
-
+    matches = anchors.new(anchors.size(0)).zero_().long() - IGNORE_IDX
     match_thr = ifnone(match_thr, IOU_THRESHOLDS_FOREGROUND)
     back_thr = ifnone(back_thr, IOU_THRESHOLDS_BACKGROUND)
-    device = targets.device
-
     # Calculate IOU between given targets & anchors
     iou_vals = box_iou(targets, anchors)
-
     # Grab the best ground_truth overlap
-    vals, matches = iou_vals.max(dim=0)
-
-    # Assign candidate matches with low quality to negative (unassigned) values
-    below_low_threshold = vals < back_thr
-    between_thresholds = (vals >= back_thr) & (vals < match_thr)
-
-    matches[below_low_threshold] = torch.tensor(
-        BACKGROUND_IDX, device=matches.device, dtype=matches.dtype
-    )
-    matches[between_thresholds] = torch.tensor(
-        IGNORE_IDX, device=matches.device, dtype=matches.dtype
-    )
+    vals, idxs = iou_vals.max(dim=0)
+    # Grab the idxs
+    matches[vals < back_thr] = BACKGROUND_IDX
+    matches[vals > match_thr] = idxs[vals > match_thr]
 
     return matches
