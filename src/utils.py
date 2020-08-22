@@ -146,11 +146,12 @@ def activ_2_bbox(
     pred_boxes = torch.stack(
         (pred_boxes1, pred_boxes2, pred_boxes3, pred_boxes4), dim=2
     ).flatten(1)
+    
     return pred_boxes
 
 
 def matcher(
-    targets: Tensor, anchors: Tensor, match_thr: float = None, back_thr: float = None
+    anchors: Tensor, targets: Tensor, match_thr: float = None, back_thr: float = None
 ) -> Tensor:
     """
     Match `anchors` to targets. -1 is match to background, -2 is ignore.
