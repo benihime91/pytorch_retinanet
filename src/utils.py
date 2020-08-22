@@ -4,7 +4,6 @@ from typing import *
 
 import torch
 from torch.functional import Tensor
-from torchvision.ops.boxes import box_iou
 
 from .config import *
 
@@ -175,11 +174,33 @@ def matcher(
     if targets.numel() == 0:
         return matches
     # Calculate IOU between given targets & anchors
-    iou_vals = box_iou(anchors, targets)
+    iou_vals = compute_IOU(anchors, targets)
     # Grab the best ground_truth overlap
-    vals, idxs = iou_vals.max(dim=0)
+    vals, idxs = iou_vals.max(dim=1)
     # Grab the idxs
     matches[vals < back_thr] = BACKGROUND_IDX
     matches[vals > match_thr] = idxs[vals > match_thr]
 
     return matches
+
+
+def compute_IOU(anchors, targets):
+    "Compute the IoU values of `anchors` by `targets`."
+    inter = intersection(anchors, targets)
+    anc_sz, tgt_sz = anchors[:, 2] * anchors[:, 3], targets[:, 2] * targets[:, 3]
+    union = anc_sz.unsqueeze(1) + tgt_sz.unsqueeze(0) - inter
+    return inter / (union + 1e-8)
+
+
+def intersection(anchors, targets):
+    "Compute the sizes of the intersections of `anchors` by `targets`."
+    a, t = anchors.size(0), targets.size(0)
+    ancs, tgts = (
+        anchors.unsqueeze(1).expand(a, t, 4),
+        targets.unsqueeze(0).expand(a, t, 4),
+    )
+    top_left_i = torch.max(ancs[..., :2], tgts[..., :2])
+    bot_right_i = torch.min(ancs[..., 2:], tgts[..., 2:])
+    sizes = torch.clamp(bot_right_i - top_left_i, min=0)
+    return sizes[..., 0] * sizes[..., 1]
+
