@@ -128,6 +128,7 @@ def matcher(
     # - if the maximum overlap is greater than 0.5, we match the anchor box to that ground truth object.
     # The classifier's target will be the category of that target.
     # - if the maximum overlap is between 0.4 and 0.5, we ignore that anchor in our loss computation.
+    assert match_thr > back_thr
     matches = anchors.new(anchors.size(0)).zero_().long() - IGNORE_IDX
 
     if targets.numel() == 0:
@@ -136,9 +137,9 @@ def matcher(
     match_thr = ifnone(match_thr, IOU_THRESHOLDS_FOREGROUND)
     back_thr = ifnone(back_thr, IOU_THRESHOLDS_BACKGROUND)
     # Calculate IOU between given targets & anchors
-    iou_vals = box_iou(targets, anchors)
+    iou_vals = box_iou(anchors, targets)
     # Grab the best ground_truth overlap
-    vals, idxs = iou_vals.max(dim=1)
+    vals, idxs = iou_vals.max(dim=0)
     # Grab the idxs
     matches[vals < back_thr] = BACKGROUND_IDX
     matches[vals > match_thr] = idxs[vals > match_thr]

@@ -19,9 +19,7 @@ def focal_loss(inputs: Tensor, targets: Tensor,) -> Tensor:
     alphas = (1 - targets) * alpha + targets * (1 - alpha)
     weights.pow_(gamma).mul_(alphas)
 
-    clas_loss = F.binary_cross_entropy_with_logits(
-        inputs, targets, weights, reduction="sum"
-    )
+    clas_loss = F.binary_cross_entropy_with_logits(inputs, targets, weights, reduction="sum")
 
     return clas_loss
 
@@ -39,9 +37,19 @@ class RetinaNetLosses(nn.Module):
         target[i1s[mask], idxs[mask] - 1] = 1
         return target
 
-    def calc_loss(self, anchors, clas_pred, bbox_pred, clas_tgt, bbox_tgt):
+    def calc_loss(
+        self,
+        anchors: Tensor,
+        clas_pred: Tensor,
+        bbox_pred: Tensor,
+        clas_tgt: Tensor,
+        bbox_tgt: Tensor,
+    ):
 
+        """Calculate loss for class & box subnet of retinanet"""
+        # Match boxes with anchors to get `background`, `ignore` and `foregoround` positions
         matches = matcher(bbox_tgt, anchors)
+        # create filtering mask to filter `background` and `ignore` classes from the bboxes
         bbox_mask = matches >= 0
 
         if bbox_mask.sum() != 0:
@@ -56,40 +64,42 @@ class RetinaNetLosses(nn.Module):
         matches.add_(1)
 
         clas_tgt = clas_tgt + 1
+        # filtering mask to filter `ignore` classes from the class predicitons
         clas_mask = matches >= 0
         clas_pred = clas_pred[clas_mask]
-
+        # Build targets
         clas_tgt = torch.cat([clas_tgt.new_zeros(1).long(), clas_tgt])
         clas_tgt = clas_tgt[matches[clas_mask]]
+        # one hot the class targets
+        clas_tgt = self._encode_class(clas_tgt)
 
-        clas_loss = focal_loss(clas_pred, clas_tgt) / torch.clamp(
-            bbox_mask.sum(), min=1.0
-        )
+        clas_loss = focal_loss(clas_pred, clas_tgt) / torch.clamp(bbox_mask.sum(), min=1.0)
 
         return clas_loss, bb_loss
 
-    def forward(self, targets, head_outputs, anchors):
-
+    def forward(
+        self,
+        targets: List[Dict[str, Tensor]],
+        head_outputs: List[Tensor],
+        anchors: List[Tensor],
+    ) -> Dict[str, Tensor]:
+        # extract the class_predictions & bbox_predictions from the RetinaNet Head Outputs
         clas_preds, bbox_preds = head_outputs["cls_preds"], head_outputs["bbox_preds"]
-
         loss = {}
+
         loss["classification_loss"] = []
         loss["regression_loss"] = []
 
-        for cls_pred, bb_pred, targs, ancs in zip(
-            clas_preds, bbox_preds, targets, anchors
-        ):
-
+        for cls_pred, bb_pred, targs, ancs in zip(clas_preds, bbox_preds, targets, anchors):
+            # Extract the Labels & boxes from the targets
             class_targs, bbox_targs = targs["labels"], targs["boxes"]
-
             # Compute loss
-            clas_loss, bb_loss = self.calc_loss(
-                ancs, cls_pred, bb_pred, class_targs, bbox_targs
-            )
+            clas_loss, bb_loss = self.calc_loss(ancs, cls_pred, bb_pred, class_targs, bbox_targs)
 
+            # Append Losses
             loss["classification_loss"].append(clas_loss)
             loss["regression_loss"].append(bb_loss)
-
+        # Calculate Average
         loss["classification_loss"] = sum(loss["classification_loss"]) / len(targets)
         loss["regression_loss"] = sum(loss["regression_loss"]) / len(targets)
         return loss

@@ -187,7 +187,7 @@ class AnchorGenerator(nn.Module):
 
         return anchors
 
-    def forward(self, feature_maps: List[Tensor]) -> List[Tensor]:
+    def forward(self, images: List[Tensor], feature_maps: List[Tensor]) -> List[Tensor]:
         """
         Generate `Anchors` for each `Feature Map`.
 
@@ -195,20 +195,19 @@ class AnchorGenerator(nn.Module):
           1. features (list[Tensor]): list of backbone feature maps on which to generate anchors.
 
         Returns:
-          list[Tensor]: a list of Tensors containing all the anchors for each feature map
+          list[Tensor]: a list of Tensors containing all the anchors for each feature map for all Images.
                         (i.e. the cell anchors repeated over all locations in the feature map).
                         The number of anchors of each feature map is Hi x Wi x num_cell_anchors,
                         where Hi, Wi are Height & Width of the Feature Map respectively.
         """
         # Grab the size of each of the feature maps
         grid_sizes = [feature_map.shape[-2:] for feature_map in feature_maps]
+        device = feature_maps[0].device
+        anchors = []
+        # calculate achors for all Images
+        for _ in images:
+            # Generate anchors for all Features Map
+            ancs = self.grid_anchors(grid_sizes, device=device)
+            anchors.append(ancs)
 
-        # Extract the dtype & device
-        dtype, device = feature_maps[0].dtype, feature_maps[0].device
-
-        # Generate anchors for all Features Map
-        anchors_over_all_feature_maps = self.grid_anchors(grid_sizes, device=device)
-
-        # Concate anchors to a single List[Tensor]
-        anchors = [torch.cat(anchors_over_all_feature_maps, dim=0)]
-        return anchors
+        return [torch.cat(anchors_per_image) for anchors_per_image in anchors]
