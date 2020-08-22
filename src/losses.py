@@ -68,7 +68,7 @@ class RetinaNetLosses(nn.Module):
         # Calculate Regression Loss
         bbox_pred = head_outputs["bbox_preds"]
         loss = []
-        for (tgt, bb_pred, ancs, m_idx,) in zip(targets, bbox_pred, anchors, matches):
+        for tgt, bb_pred, ancs, m_idx in zip(targets, bbox_pred, anchors, matches):
             # get the targets for each proposal
             bbox_tgt = tgt["boxes"]
 
