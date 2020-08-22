@@ -1,11 +1,7 @@
 from typing import *
-
-# TODO: cleanup
-
 # -----------------------------------------------------------------------------
 # Config definition
 # -----------------------------------------------------------------------------
-
 
 # -----------------------------------------------------------------------------
 # `Generalized RCNN` Input  Transformation Options
@@ -78,7 +74,7 @@ NMS_THRES: float = 0.5
 # A default threshold of 0.0 increases AP by ~0.2-0.3 but significantly slows down
 # inference.
 SCORE_THRES: float = 0.05
-MAX_DETECTIONS_PER_IMAGE: int = 500
+MAX_DETECTIONS_PER_IMAGE: int = 300
 
 # Wether to freeze `BatchNormalization` layers of `backbone`
 FREEZE_BN: bool = True

@@ -44,7 +44,7 @@ class RetinaNetLosses(nn.Module):
         bbox_pred: Tensor,
         clas_tgt: Tensor,
         bbox_tgt: Tensor,
-    ):
+    )->Tuple[Tensor, Tensor]:
 
         """Calculate loss for class & box subnet of retinanet"""
         # Match boxes with anchors to get `background`, `ignore` and `foregoround` positions
@@ -72,9 +72,7 @@ class RetinaNetLosses(nn.Module):
         clas_tgt = clas_tgt[matches[clas_mask]]
         # one hot the class targets
         clas_tgt = self._encode_class(clas_tgt)
-
         clas_loss = focal_loss(clas_pred, clas_tgt) / torch.clamp(bbox_mask.sum(), min=1.0)
-
         return clas_loss, bb_loss
 
     def forward(
@@ -95,11 +93,12 @@ class RetinaNetLosses(nn.Module):
             class_targs, bbox_targs = targs["labels"], targs["boxes"]
             # Compute loss
             clas_loss, bb_loss = self.calc_loss(ancs, cls_pred, bb_pred, class_targs, bbox_targs)
-
             # Append Losses
             loss["classification_loss"].append(clas_loss)
             loss["regression_loss"].append(bb_loss)
+
         # Calculate Average
         loss["classification_loss"] = sum(loss["classification_loss"]) / len(targets)
         loss["regression_loss"] = sum(loss["regression_loss"]) / len(targets)
+
         return loss
