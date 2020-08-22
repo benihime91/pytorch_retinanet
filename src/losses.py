@@ -38,7 +38,9 @@ class RetinaNetLosses(nn.Module):
         target = idxs.new_zeros(len(idxs), self.n_c).float()
         mask = idxs != 0
         i1s = torch.tensor(list(range(len(idxs))), dtype=idxs.dtype, device=idxs.device)
-        target[i1s[mask], idxs[mask] - 1] = 1
+        target[i1s[mask], idxs[mask] - 1] = torch.tensor(
+            1, dtype=target.dtype, device=target.device
+        )
         return target
 
     def calc_loss(
