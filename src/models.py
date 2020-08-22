@@ -108,7 +108,6 @@ class Retinanet(nn.Module):
         # ------------------------------------------------------
         # Assemble `RetinaNet`
         # ------------------------------------------------------
-
         # # Instantiate `GeneralizedRCNNTransform` to resize inputs
         self.transform_inputs = GeneralizedRCNNTransform(min_size, max_size, image_mean, image_std)
         # Get the back bone of the Model
@@ -118,11 +117,9 @@ class Retinanet(nn.Module):
         self.fpn_szs = self._get_backbone_ouputs()
         # # Instantiate the `FPN`
         self.fpn = FPN(self.fpn_szs[0], self.fpn_szs[1], self.fpn_szs[2], out_channels=256)
-
         # # Instantiate anchor Generator
         self.anchor_generator = anchor_generator
         self.num_anchors = self.anchor_generator.num_cell_anchors[0]
-
         # # Instantiate `RetinaNetHead`
         self.retinanet_head = RetinaNetHead(
             256, 256, self.num_anchors, num_classes, prior
@@ -151,13 +148,7 @@ class Retinanet(nn.Module):
             ]
         return fpn_szs
 
-    def compute_loss(
-        self,
-        targets: List[Dict[str, Tensor]],
-        outputs: Dict[str, Tensor],
-        anchors: List[Tensor],
-    ) -> Dict[str, Tensor]:
-
+    def compute_loss(self,targets: List[Dict[str, Tensor]],outputs: Dict[str, Tensor],anchors: List[Tensor]):
         return self.retinanet_head.compute_loss(targets, outputs, anchors)
 
     def process_detections(self,outputs: Dict[str, Tensor],anchors: List[Tensor],im_szs: List[Tuple[int, int]]):
@@ -170,7 +161,6 @@ class Retinanet(nn.Module):
         labels = torch.arange(num_classes, device=device)
         labels = labels.view(1, -1).expand_as(scores)
         final_detections = []
-
         for bb_per_im, sc_per_im, lbl_per_im, anc_per_im, im_sz in zip(bbox_preds, scores, labels, anchors, im_szs):
             # Convert the activations: outputs from the model in bboxes
             boxes_per_image = activ_2_bbox(bb_per_im, anc_per_im)
@@ -195,11 +185,9 @@ class Retinanet(nn.Module):
                 # mask only topk scoring predictions
                 mask = mask[: self.detections_per_img]
                 bb_per_cls, sc_per_cls, lbl_per_cls = (bb_per_cls[mask], sc_per_cls[mask], lbl_per_cls[mask])
-
                 all_boxes.append(bb_per_cls)
                 all_scores.append(sc_per_cls)
                 all_labels.append(lbl_per_cls)
-
             final_detections.append(
                 {
                     "boxes": torch.cat(all_boxes, dim=0),
@@ -216,12 +204,9 @@ class Retinanet(nn.Module):
         else:
             return detections
 
-    def forward(
-        self, images: List[Tensor], targets: Optional[List[Dict[str, Tensor]]] = None
-    ):
+    def forward(self, images: List[Tensor], targets: Optional[List[Dict[str, Tensor]]] = None):
         if self.training and targets is None:
             raise ValueError("In training Model `targets` must be given")
-
         # Grab the original Image sizes
         orig_im_szs = []
         for im in images:
@@ -230,25 +215,20 @@ class Retinanet(nn.Module):
             orig_im_szs.append((val[0], val[1]))
 
         images, targets = self.transform_inputs(images, targets)
-        feature_maps = self.backbone(images.tensors)
+        feature_maps    = self.backbone(images.tensors)
+        fpn_outputs     = self.fpn(feature_maps)
+        outputs         = self.retinanet_head(fpn_outputs)
 
-        fpn_outputs = self.fpn(feature_maps)
-        outputs = self.retinanet_head(fpn_outputs)
-
-        anchors = self.anchor_generator(images, fpn_outputs)
+        anchors         = self.anchor_generator(images, fpn_outputs)
 
         losses = {}
         detections = torch.jit.annotate(List[Dict[str, Tensor]], [])
 
         if self.training:
             losses = self.compute_loss(targets, outputs, anchors)
-
         else:
             # compute the detections
             with torch.no_grad():
-
                 detections = self.process_detections(outputs, anchors, images.image_sizes)
-
                 detections = self.transform_inputs.postprocess(detections, images.image_sizes, orig_im_szs)
-
         return self._get_outputs(losses, detections)
