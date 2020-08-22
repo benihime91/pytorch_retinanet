@@ -97,17 +97,12 @@ class RetinaNetHead(nn.Module):
         targets: List[Dict[str, Tensor]],
         outputs: Dict[str, Tensor],
         anchors: List[Tensor],
-        matched_idxs: List[Tensor],
     ) -> Dict[str, Tensor]:
 
         # Calculate Losses
         output_dict = {
-            "classification_loss": self.losses.classification_loss(
-                targets, outputs, matched_idxs,
-            ),
-            "bbox_regression": self.losses.regression_loss(
-                targets, outputs, anchors, matched_idxs
-            ),
+            "classification_loss": self.losses.class_loss(targets, outputs, anchors),
+            "bbox_regression": self.losses.bbox_loss(targets, outputs, anchors),
         }
         return output_dict
 

@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from torch import nn
 from torch.functional import Tensor
 from .config import *
-from .utils import bbox_2_activ
+from .utils import bbox_2_activ, matcher
 
 
 def focal_loss(inputs: Tensor, targets: Tensor,) -> Tensor:
@@ -38,17 +38,20 @@ class RetinaNetLosses(nn.Module):
         target[i1s[mask], idxs[mask] - 1] = 1
         return target
 
-    def classification_loss(self, targets, head_outputs, matches):
+    def class_loss(self, targets, head_outputs, anchors):
         # Calculate Classification Loss for `ClassSubnet` of  `RetinaNet`
         loss = []
         cls_logits = head_outputs["cls_preds"]
 
-        for clas_tgt, clas_pred, m_idx in zip(targets, cls_logits, matches):
+        for clas_tgt, clas_pred, ancs in zip(targets, cls_logits, anchors):
+            # match targets with anchors
+            m_idx = matcher(clas_tgt, ancs)
+            fgs = m_idx >= 0
+            m_idx.add_(1)
+
+            # Extract the class target labels
             clas_tgt = clas_tgt["labels"]
 
-            fgs = m_idx >= 0
-
-            m_idx.add_(1)
             clas_tgt = clas_tgt + 1
             clas_mask = m_idx >= 0
             clas_pred = clas_pred[clas_mask]
@@ -64,16 +67,17 @@ class RetinaNetLosses(nn.Module):
         loss = sum(loss)
         return loss / len(targets)
 
-    def regression_loss(self, targets, head_outputs, anchors, matches):
+    def bbox_loss(self, targets, head_outputs, anchors):
         # Calculate Regression Loss
         bbox_pred = head_outputs["bbox_preds"]
         loss = []
-        for tgt, bb_pred, ancs, m_idx in zip(targets, bbox_pred, anchors, matches):
+        for tgt, bb_pred, ancs in zip(targets, bbox_pred, anchors):
+            # match targets with anchors
+            # determine only the foreground indices, ignore the rest
+            m_idx = matcher(tgt, ancs)
+            bbox_mask = m_idx >= 0
             # get the targets for each proposal
             bbox_tgt = tgt["boxes"]
-
-            # determine only the foreground indices, ignore the rest
-            bbox_mask = m_idx >= 0
             if bbox_mask.sum() != 0:
                 # select only the foreground boxes
                 bb_pred = bb_pred[bbox_mask]
