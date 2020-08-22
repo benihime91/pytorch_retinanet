@@ -1,7 +1,6 @@
 import importlib
 import math
 from typing import *
-
 import torch
 from torch.functional import Tensor
 
@@ -146,7 +145,7 @@ def activ_2_bbox(
     pred_boxes = torch.stack(
         (pred_boxes1, pred_boxes2, pred_boxes3, pred_boxes4), dim=2
     ).flatten(1)
-    
+
     return pred_boxes
 
 
