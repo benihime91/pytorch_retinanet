@@ -129,6 +129,10 @@ def matcher(
     # The classifier's target will be the category of that target.
     # - if the maximum overlap is between 0.4 and 0.5, we ignore that anchor in our loss computation.
     matches = anchors.new(anchors.size(0)).zero_().long() - IGNORE_IDX
+
+    if targets.numel() == 0:
+        return matches
+
     match_thr = ifnone(match_thr, IOU_THRESHOLDS_FOREGROUND)
     back_thr = ifnone(back_thr, IOU_THRESHOLDS_BACKGROUND)
     # Calculate IOU between given targets & anchors

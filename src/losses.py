@@ -68,17 +68,12 @@ class RetinaNetLosses(nn.Module):
         # Calculate Regression Loss
         bbox_pred = head_outputs["bbox_preds"]
         loss = []
-
         for (tgt, bb_pred, ancs, m_idx,) in zip(targets, bbox_pred, anchors, matches):
-            # no matches means there were no annotations in this image
-            if m_idx.numel() == 0:
-                continue
             # get the targets for each proposal
             bbox_tgt = tgt["boxes"]
 
             # determine only the foreground indices, ignore the rest
             bbox_mask = m_idx >= 0
-
             if bbox_mask.sum() != 0:
                 # select only the foreground boxes
                 bb_pred = bb_pred[bbox_mask]
