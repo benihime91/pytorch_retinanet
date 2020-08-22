@@ -138,7 +138,7 @@ def matcher(
     # Calculate IOU between given targets & anchors
     iou_vals = box_iou(targets, anchors)
     # Grab the best ground_truth overlap
-    vals, idxs = iou_vals.max(dim=0)
+    vals, idxs = iou_vals.max(dim=1)
     # Grab the idxs
     matches[vals < back_thr] = BACKGROUND_IDX
     matches[vals > match_thr] = idxs[vals > match_thr]
