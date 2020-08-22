@@ -42,9 +42,9 @@ class RetinaNetLosses(nn.Module):
         # Calculate Classification Loss for `ClassSubnet` of  `RetinaNet`
         loss = []
         cls_logits = head_outputs["cls_preds"]
-        targets = targets["labels"]
 
         for clas_tgt, clas_pred, m_idx in zip(targets, cls_logits, matches):
+            clas_tgt = clas_tgt["labels"]
 
             fgs = m_idx >= 0
 
@@ -54,8 +54,8 @@ class RetinaNetLosses(nn.Module):
             clas_pred = clas_pred[clas_mask]
 
             clas_tgt = torch.cat([clas_tgt.new_zeros(1).long(), clas_tgt])
-            clas_tgt = clas_tgt[matches[clas_mask]]
-            clas_tgt = self._encode_class(clas_tgt, clas_pred.size(1))
+            clas_tgt = clas_tgt[m_idx[clas_mask]]
+            clas_tgt = self._encode_class(clas_tgt)
 
             clas_loss = focal_loss(clas_pred, clas_tgt) / torch.clamp(
                 fgs.sum(), min=1.0
@@ -73,19 +73,19 @@ class RetinaNetLosses(nn.Module):
             # no matches means there were no annotations in this image
             if m_idx.numel() == 0:
                 continue
-
-            # get the targets corresponding GT for each proposal
-            matched = tgt["boxes"][m_idx.clamp(min=0)]
+            # get the targets for each proposal
+            bbox_tgt = tgt["boxes"]
 
             # determine only the foreground indices, ignore the rest
             bbox_mask = m_idx >= 0
+
             if bbox_mask.sum() != 0:
                 # select only the foreground boxes
-                matched = matched[bbox_mask, :]
-                bb_pred = bb_pred[bbox_mask, :]
-                ancs = ancs[bbox_mask, :]
+                bb_pred = bb_pred[bbox_mask]
+                bbox_tgt = bbox_tgt[m_idx[bbox_mask]]
+                ancs = ancs[bbox_mask]
                 # compute the regression targets
-                bbox_targ = bbox_2_activ(matched, ancs)
+                bbox_targ = bbox_2_activ(bbox_tgt, ancs)
                 # compute the loss
                 bb_loss = F.smooth_l1_loss(bb_pred, bbox_targ)
             else:
