@@ -87,8 +87,8 @@ class RetinaNetHead(nn.Module):
     ) -> None:
         super(RetinaNetHead, self).__init__()
         self.classification_head = RetinaNetClassSubnet(in_channels, out_channels, num_anchors, num_classes, prior)
-        self.regression_head = RetinaNetBoxSubnet(in_channels, out_channels, num_anchors)
-        self.losses = RetinaNetLosses(num_classes)
+        self.regression_head     = RetinaNetBoxSubnet(in_channels, out_channels, num_anchors)
+        self.losses              = RetinaNetLosses(num_classes)
 
     def compute_loss(self, targets: List[Dict[str, Tensor]], outputs: Dict[str, Tensor], anchors: List[Tensor]):
         # Calculate Losses
