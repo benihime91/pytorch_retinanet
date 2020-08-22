@@ -90,7 +90,7 @@ class RetinaNetHead(nn.Module):
         self.regression_head = RetinaNetBoxSubnet(
             in_channels, out_channels, num_anchors
         )
-        self.losses = RetinaNetLosses()
+        self.losses = RetinaNetLosses(num_classes)
 
     def compute_loss(
         self,
@@ -103,7 +103,7 @@ class RetinaNetHead(nn.Module):
         # Calculate Losses
         output_dict = {
             "classification_loss": self.losses.classification_loss(
-                targets, outputs, matched_idxs
+                targets, outputs, matched_idxs,
             ),
             "bbox_regression": self.losses.regression_loss(
                 targets, outputs, anchors, matched_idxs

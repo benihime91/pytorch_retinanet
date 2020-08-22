@@ -26,40 +26,40 @@ def focal_loss(inputs: Tensor, targets: Tensor,) -> Tensor:
 
 
 class RetinaNetLosses(nn.Module):
-    def __init__(self) -> None:
+    def __init__(self, num_classes) -> None:
         super(RetinaNetLosses, self).__init__()
+        self.n_c = num_classes
+
+    def _encode_class(self, idxs):
+        "one_hot encode targets such that 0 is the `background`"
+        target = idxs.new_zeros(len(idxs), self.n_c).float()
+        mask = idxs != 0
+        i1s = torch.LongTensor(list(range(len(idxs))))
+        target[i1s[mask], idxs[mask] - 1] = 1
+        return target
 
     def classification_loss(self, targets, head_outputs, matches):
         # Calculate Classification Loss for `ClassSubnet` of  `RetinaNet`
-
         loss = []
-
         cls_logits = head_outputs["cls_preds"]
+        targets = targets["labels"]
 
-        for tgt, clas_pred, m_idx in zip(targets, cls_logits, matches):
-            # no matches means there were no annotations in this image
-            if m_idx.numel() == 0:
-                clas_tgt = torch.zeros_like(clas_pred)
-                valid = torch.arange(clas_pred.shape[0])
-                num_fgs = torch.tensor(0.0, device=m_idx.device, dtype=m_idx.dtype)
+        for clas_tgt, clas_pred, m_idx in zip(targets, cls_logits, matches):
 
-            else:
-                # determine only the foreground
-                clas_mask = m_idx >= 0
-                num_fgs = clas_mask.sum()
-                # create the target classification
-                clas_tgt = torch.zeros_like(clas_pred)
-                clas_tgt[clas_mask, tgt["labels"][m_idx[clas_mask]]] = torch.tensor(
-                    1.0, device=clas_tgt.device, dtype=clas_tgt.dtype
-                )
+            fgs = m_idx >= 0
 
-                # find indices for which anchors should be ignored
-                valid = m_idx != IGNORE_IDX
-            # compute the classification loss
-            clas_loss = focal_loss(clas_pred[valid], clas_tgt[valid]) / torch.clamp(
-                num_fgs, min=1.0
+            m_idx.add_(1)
+            clas_tgt = clas_tgt + 1
+            clas_mask = m_idx >= 0
+            clas_pred = clas_pred[clas_mask]
+
+            clas_tgt = torch.cat([clas_tgt.new_zeros(1).long(), clas_tgt])
+            clas_tgt = clas_tgt[matches[clas_mask]]
+            clas_tgt = self._encode_class(clas_tgt, clas_pred.size(1))
+
+            clas_loss = focal_loss(clas_pred, clas_tgt) / torch.clamp(
+                fgs.sum(), min=1.0
             )
-
             loss.append(clas_loss)
         loss = sum(loss)
         return loss / len(targets)
