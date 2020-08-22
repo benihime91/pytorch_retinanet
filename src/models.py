@@ -121,9 +121,7 @@ class Retinanet(nn.Module):
         self.anchor_generator = anchor_generator
         self.num_anchors = self.anchor_generator.num_cell_anchors[0]
         # # Instantiate `RetinaNetHead`
-        self.retinanet_head = RetinaNetHead(
-            256, 256, self.num_anchors, num_classes, prior
-        )
+        self.retinanet_head = RetinaNetHead(256, 256, self.num_anchors, num_classes, prior)
 
         # ------------------------------------------------------
         # Parameters
@@ -217,14 +215,13 @@ class Retinanet(nn.Module):
         images, targets = self.transform_inputs(images, targets)
         feature_maps    = self.backbone(images.tensors)
         fpn_outputs     = self.fpn(feature_maps)
-        outputs         = self.retinanet_head(fpn_outputs)
-
         anchors         = self.anchor_generator(images, fpn_outputs)
+        outputs         = self.retinanet_head(fpn_outputs)
 
         losses = {}
         detections = torch.jit.annotate(List[Dict[str, Tensor]], [])
-
         if self.training:
+            # Comput Loss
             losses = self.compute_loss(targets, outputs, anchors)
         else:
             # compute the detections
