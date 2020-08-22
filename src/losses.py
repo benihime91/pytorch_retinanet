@@ -2,7 +2,7 @@ from typing import *
 
 import torch
 import torch.nn.functional as F
-from torch import nn
+from torch import dtype, nn
 from torch.functional import Tensor
 
 from .config import *
@@ -37,7 +37,7 @@ class RetinaNetLosses(nn.Module):
         "one_hot encode targets such that 0 is the `background`"
         target = idxs.new_zeros(len(idxs), self.n_c).float()
         mask = idxs != 0
-        i1s = torch.LongTensor(list(range(len(idxs))))
+        i1s = torch.tensor(list(range(len(idxs))), dtype=idxs.dtype, device=idxs.device)
         target[i1s[mask], idxs[mask] - 1] = 1
         return target
 
