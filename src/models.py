@@ -160,30 +160,18 @@ class Retinanet(nn.Module):
 
         return self.retinanet_head.compute_loss(targets, outputs, anchors)
 
-    def process_detections(
-        self,
-        outputs: Dict[str, Tensor],
-        anchors: List[Tensor],
-        im_szs: List[Tuple[int, int]],
-    ) -> List[Dict[str, Tensor]]:
-
+    def process_detections(self,outputs: Dict[str, Tensor],anchors: List[Tensor],im_szs: List[Tuple[int, int]]):
         class_logits = outputs.pop("cls_preds")
         bbox_preds = outputs.pop("bbox_preds")
         scores = torch.sigmoid(class_logits)
-
         device = class_logits.device
         num_classes = class_logits.shape[-1]
-
         # create labels for each score
         labels = torch.arange(num_classes, device=device)
         labels = labels.view(1, -1).expand_as(scores)
-
         final_detections = []
 
-        for bb_per_im, sc_per_im, lbl_per_im, anc_per_im, im_sz in zip(
-            bbox_preds, scores, labels, anchors, im_szs
-        ):
-
+        for bb_per_im, sc_per_im, lbl_per_im, anc_per_im, im_sz in zip(bbox_preds, scores, labels, anchors, im_szs):
             # Convert the activations: outputs from the model in bboxes
             boxes_per_image = activ_2_bbox(bb_per_im, anc_per_im)
             # clip boxes to image size
@@ -196,31 +184,17 @@ class Retinanet(nn.Module):
             for cls_idx in range(num_classes):
                 # remove low scoring boxes
                 lw_idx = torch.gt(sc_per_im[:, cls_idx], self.score_thres)
-
                 bb_per_cls, sc_per_cls, lbl_per_cls = (
-                    boxes_per_image[lw_idx],
-                    sc_per_im[lw_idx, cls_idx],
-                    lbl_per_im[lw_idx, cls_idx],
-                )
+                    boxes_per_image[lw_idx], sc_per_im[lw_idx, cls_idx], lbl_per_im[lw_idx, cls_idx]
+                    )
                 # remove empty boxes
                 mask = remove_small_boxes(bb_per_cls, min_size=1e-2)
-
-                bb_per_cls, sc_per_cls, lbl_per_cls = (
-                    bb_per_cls[mask],
-                    sc_per_cls[mask],
-                    lbl_per_cls[mask],
-                )
-
+                bb_per_cls, sc_per_cls, lbl_per_cls = (bb_per_cls[mask], sc_per_cls[mask], lbl_per_cls[mask])
                 # non-maximum suppression, independently done per class
                 mask = nms(bb_per_cls, sc_per_cls, self.nms_thres)
-
                 # mask only topk scoring predictions
                 mask = mask[: self.detections_per_img]
-                bb_per_cls, sc_per_cls, lbl_per_cls = (
-                    bb_per_cls[mask],
-                    sc_per_cls[mask],
-                    lbl_per_cls[mask],
-                )
+                bb_per_cls, sc_per_cls, lbl_per_cls = (bb_per_cls[mask], sc_per_cls[mask], lbl_per_cls[mask])
 
                 all_boxes.append(bb_per_cls)
                 all_scores.append(sc_per_cls)

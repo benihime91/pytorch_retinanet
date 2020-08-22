@@ -29,8 +29,8 @@ class RetinaNetLosses(nn.Module):
 
         return clas_loss
 
-    def calc_loss(self,anchors: Tensor,clas_pred: Tensor,bbox_pred: Tensor,clas_tgt: Tensor,bbox_tgt: Tensor):
-        
+    def calc_loss(self,anchors, clas_pred, bbox_pred, clas_tgt, bbox_tgt):
+
         """Calculate loss for class & box subnet of retinanet"""
         # Match boxes with anchors to get `background`, `ignore` and `foregoround` positions
         matches = matcher(anchors, bbox_tgt)
@@ -61,7 +61,7 @@ class RetinaNetLosses(nn.Module):
         
         return clas_loss, bb_loss
 
-    def forward(self,targets: List[Dict[str, Tensor]],head_outputs: List[Tensor],anchors: List[Tensor]) -> Dict[str, Tensor]:
+    def forward(self, targets: List[Dict[str, Tensor]],head_outputs: List[Tensor],anchors: List[Tensor]):
         # extract the class_predictions & bbox_predictions from the RetinaNet Head Outputs
         clas_preds, bbox_preds = head_outputs["cls_preds"], head_outputs["bbox_preds"]
         loss = {}
@@ -69,15 +69,12 @@ class RetinaNetLosses(nn.Module):
         loss["classification_loss"] = []
         loss["regression_loss"] = []
 
-        for cls_pred, bb_pred, targs, ancs in zip(
-            clas_preds, bbox_preds, targets, anchors
-        ):
+        for cls_pred, bb_pred, targs, ancs in zip(clas_preds, bbox_preds, targets, anchors):
             # Extract the Labels & boxes from the targets
             class_targs, bbox_targs = targs["labels"], targs["boxes"]
             # Compute loss
-            clas_loss, bb_loss = self.calc_loss(
-                ancs, cls_pred, bb_pred, class_targs, bbox_targs
-            )
+            clas_loss, bb_loss = self.calc_loss(ancs, cls_pred, bb_pred, class_targs, bbox_targs)
+            
             # Append Losses
             loss["classification_loss"].append(clas_loss)
             loss["regression_loss"].append(bb_loss)
@@ -89,7 +86,6 @@ class RetinaNetLosses(nn.Module):
         return loss
 
 def encode_class(idxs, n_classes):
-    "converts idxs into one-hot vector"
     target = idxs.new_zeros(len(idxs), n_classes).float()
     mask = idxs != 0
     i1s = torch.LongTensor(list(range(len(idxs))))
