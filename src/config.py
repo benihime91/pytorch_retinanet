@@ -41,7 +41,7 @@ IGNORE_IDX: Any = -2
 BACKGROUND_IDX: Any = -1
 # Anchors with < bg are labeled negative (-1)
 # Anchors  with >= bg and < fg are ignored (-2)
-BBOX_REG_WEIGHTS: List[float] = [1.0, 1.0, 1.0, 1.0]
+BBOX_REG_WEIGHTS: List[float] = [0.1, 0.1, 0.2, 0.2]
 # Weights on (dx, dy, dw, dh) for normalizing Retinanet anchor regression targets
 
 
