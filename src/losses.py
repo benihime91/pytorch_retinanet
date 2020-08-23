@@ -30,9 +30,9 @@ class RetinaNetLosses(nn.Module):
     def calc_loss(self, anchors, clas_pred, bbox_pred, clas_tgt, bbox_tgt)->Tuple[Tensor, Tensor]:
         """Calculate loss for class & box subnet of retinanet"""
         # First we need to remove the padding that was added to collate our targets together.
-        i = torch.min(torch.nonzero(clas_tgt))
-        clas_tgt = clas_tgt[i:] - 1
-        bbox_tgt = bbox_tgt[i:]
+        # i = torch.min(torch.nonzero(clas_tgt))
+        # clas_tgt = clas_tgt[i:] - 1
+        # bbox_tgt = bbox_tgt[i:]
 
         # Match boxes with anchors to get `background`, `ignore` and `foregoround` positions
         matches = matcher(anchors, bbox_tgt)
@@ -49,7 +49,7 @@ class RetinaNetLosses(nn.Module):
 
         matches.add_(1)
         # filtering mask to filter `ignore` classes from the class predicitons
-        clas_tgt = clas_tgt + 1
+        # clas_tgt = clas_tgt + 1
         clas_mask = matches >= 0
         clas_pred = clas_pred[clas_mask]
         # Build targets
