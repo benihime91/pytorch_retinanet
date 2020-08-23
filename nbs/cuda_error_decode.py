@@ -7,20 +7,6 @@ Original file is located at
     https://colab.research.google.com/drive/1a9VtI5w8QJ5x7TuRaxQugMbrmrNVnoMr
 """
 
-# ! git clone https://github.com/benihime91/pytorch_retinanet.git # Clone the Repo
-
-# # Extracting the Data assuming data is stored in `/content/drive/My Drive/Data/oxford-iiit-pet.tgz`
-# ! tar zxf /content/drive/My\ Drive/Data/oxford-iiit-pet.tgz -C /content/
-# ! echo " >> Data Unziped"
-
-# # Commented out IPython magic to ensure Python compatibility.
-# # %%bash
-# # # Colab Setup : Install Required Libraries
-# # pip install -U pytorch-lightning --quiet
-# # pip install -U git+https://github.com/albumentations-team/albumentations --quiet
-# # pip install -U bounding_box --quiet
-# # echo " >> Libraries successfully installed !"
-
 # RetinaNet Imports
 from src.models import Retinanet
 from src.eval_utils.coco_eval import CocoEvaluator
@@ -109,22 +95,15 @@ df_test.reset_index(drop=True, inplace=True)
 # --------------------------------------------------------------------------------------------------
 # IMAGE TRANSFORMATIONS
 # --------------------------------------------------------------------------------------------------
-
 transformations = [
     A.HorizontalFlip(p=0.5),
-    A.CLAHE(),
-    A.IAASharpen(),
-    A.IAAPerspective(),
     A.OneOf([A.ShiftScaleRotate(), A.Rotate(limit=60),], p=1.0),
-    A.OneOf([A.RandomShadow(), A.RandomBrightnessContrast(), A.Cutout()], p=0.5),
 ]
-
 # Train Transformations
 train_transformations = transformations + [
     A.ToFloat(max_value=255.0, always_apply=True),
     ToTensorV2(always_apply=True),
 ]
-
 # Valid Transformations
 valid_transformations = [
     A.ToFloat(max_value=255.0, always_apply=True),
@@ -301,10 +280,9 @@ val_dl = DataLoader(val_ds, batch_size=VALID_BATCH_SIZE, shuffle=False, collate_
 # --------------------------------------------------------------------------------------------------
 EPOCHS = 20
 MAX_LR = 3e-05
-WD = 1e-03
 
 # Optimzier and LrScheduler
-optimizer = optim.Adam([p for p in model.parameters() if p.requires_grad], lr=MAX_LR, betas=(0.9, 0.99))
+optimizer = optim.Adam([p for p in model.parameters() if p.requires_grad], lr=MAX_LR, betas=(0.9,0.99))
 # --------------------------------------------------------------------------------------------------
 # PyTorch-Lightning CallBacks
 # --------------------------------------------------------------------------------------------------
@@ -318,8 +296,9 @@ early_stopping_callback = pl.callbacks.EarlyStopping(mode="max", monitor="bbox_I
 
 lightning_model = LitModel(model, optimizer, train_dl, val_dl, max_lr=MAX_LR)
 
-trainer = pl.Trainer(logger=[tb_logger], gradient_clip_val=0.1, checkpoint_callback=checkpoint_callback,
-                     max_epochs=EPOCHS, precision=16, gpus=1, accumulate_grad_batches=0,num_sanity_val_steps=0)
+trainer = pl.Trainer(logger=[tb_logger], gradient_clip_val=0.1, 
+                     checkpoint_callback=checkpoint_callback,
+                     max_epochs=EPOCHS, precision=16, gpus=1)
 
 trainer.fit(lightning_model)
 
