@@ -309,7 +309,12 @@ class LitModel(pl.LightningModule):
 # --------------------------------------------------------------------------------------------------
 # Model
 # --------------------------------------------------------------------------------------------------
-model = Retinanet(num_classes=len(df["target"].unique()), backbone_kind="resnet50", pretrained=True)
+# unique classes + 1: for background
+model = Retinanet(
+    num_classes=len(df["target"].unique()) + 1,
+    backbone_kind="resnet50",
+    pretrained=True,
+)
 
 # --------------------------------------------------------------------------------------------------
 # Inputs
