@@ -85,18 +85,18 @@ class Retinanet(nn.Module):
 
         super(Retinanet, self).__init__()
 
-        num_classes = ifnone(num_classes, NUM_CLASSES)
-        backbone_kind = ifnone(backbone_kind, BACKBONE)
-        prior = ifnone(prior, PRIOR)
-        pretrained = ifnone(pretrained, PRETRAINED_BACKBONE)
-        nms_thres = ifnone(nms_thres, NMS_THRES)
-        score_thres = ifnone(score_thres, SCORE_THRES)
+        num_classes      = ifnone(num_classes, NUM_CLASSES)
+        backbone_kind    = ifnone(backbone_kind, BACKBONE)
+        prior            = ifnone(prior, PRIOR)
+        pretrained       = ifnone(pretrained, PRETRAINED_BACKBONE)
+        nms_thres        = ifnone(nms_thres, NMS_THRES)
+        score_thres      = ifnone(score_thres, SCORE_THRES)
         max_detections_per_images = ifnone(max_detections_per_images, MAX_DETECTIONS_PER_IMAGE)
-        freeze_bn = ifnone(freeze_bn, FREEZE_BN)
-        min_size = ifnone(min_size, MIN_IMAGE_SIZE)
-        max_size = ifnone(max_size, MAX_IMAGE_SIZE)
-        image_mean = ifnone(image_mean, MEAN)
-        image_std = ifnone(image_std, STD)
+        freeze_bn        = ifnone(freeze_bn, FREEZE_BN)
+        min_size         = ifnone(min_size, MIN_IMAGE_SIZE)
+        max_size         = ifnone(max_size, MAX_IMAGE_SIZE)
+        image_mean       = ifnone(image_mean, MEAN)
+        image_std        = ifnone(image_std, STD)
         anchor_generator = ifnone(anchor_generator, AnchorGenerator())
 
         # The reason for the 0.05 is because that is what appears to be used by other systems as well,
@@ -111,25 +111,25 @@ class Retinanet(nn.Module):
         # # Instantiate `GeneralizedRCNNTransform` to resize inputs
         self.transform_inputs = GeneralizedRCNNTransform(min_size, max_size, image_mean, image_std)
         # Get the back bone of the Model
-        self.backbone_kind = backbone_kind
-        self.backbone = get_backbone(self.backbone_kind, pretrained, freeze_bn=freeze_bn)
+        self.backbone_kind    = backbone_kind
+        self.backbone         = get_backbone(self.backbone_kind, pretrained, freeze_bn=freeze_bn)
         # # Grab the backbone output channels
-        self.fpn_szs = self._get_backbone_ouputs()
+        self.fpn_szs          = self._get_backbone_ouputs()
         # # Instantiate the `FPN`
-        self.fpn = FPN(self.fpn_szs[0], self.fpn_szs[1], self.fpn_szs[2], out_channels=256)
+        self.fpn              = FPN(self.fpn_szs[0], self.fpn_szs[1], self.fpn_szs[2], out_channels=256)
         # # Instantiate anchor Generator
         self.anchor_generator = anchor_generator
-        self.num_anchors = self.anchor_generator.num_cell_anchors[0]
+        self.num_anchors      = self.anchor_generator.num_cell_anchors[0]
         # # Instantiate `RetinaNetHead`
-        self.retinanet_head = RetinaNetHead(256, 256, self.num_anchors, num_classes, prior)
+        self.retinanet_head   = RetinaNetHead(256, 256, self.num_anchors, num_classes, prior)
 
         # ------------------------------------------------------
         # Parameters
         # ------------------------------------------------------
-        self.score_thres = score_thres
-        self.nms_thres = nms_thres
+        self.score_thres        = score_thres
+        self.nms_thres          = nms_thres
         self.detections_per_img = max_detections_per_images
-        self.num_classes = num_classes
+        self.num_classes        = num_classes
 
     def _get_backbone_ouputs(self) -> List:
         if self.backbone_kind in __small__:
