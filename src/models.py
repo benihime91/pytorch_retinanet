@@ -68,18 +68,18 @@ class Retinanet(nn.Module):
 
     def __init__(
         self,
-        num_classes: Optional[int] = None,
+        num_classes: Optional[int]   = None,
         backbone_kind: Optional[str] = None,
-        prior: Optional[float] = None,
-        pretrained: Optional[bool] = None,
-        nms_thres: Optional[float] = None,
+        prior: Optional[float]       = None,
+        pretrained: Optional[bool]   = None,
+        nms_thres: Optional[float]   = None,
         score_thres: Optional[float] = None,
         max_detections_per_images: Optional[int] = None,
-        freeze_bn: Optional[bool] = None,
-        min_size: Optional[int] = None,
-        max_size: Optional[int] = None,
-        image_mean: List[float] = None,
-        image_std: List[float] = None,
+        freeze_bn: Optional[bool]    = None,
+        min_size: Optional[int]      = None,
+        max_size: Optional[int]      = None,
+        image_mean: List[float]      = None,
+        image_std: List[float]       = None,
         anchor_generator: Optional[AnchorGenerator] = None,
     ) -> None:
 
