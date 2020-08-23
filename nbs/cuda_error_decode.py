@@ -230,7 +230,6 @@ class LitModel(pl.LightningModule):
             alpha = min(1.0, float(self.trainer.global_step + 1) / 500.0)
             for pg in self.optimizer.param_groups:
                 pg["lr"] = alpha * self.max_lr
-
         # update params
         optimizer.step()
         optimizer.zero_grad()
@@ -255,7 +254,7 @@ class LitModel(pl.LightningModule):
         # Separate Losses
         loss_dict = self.model(images, targets)
         # Total Loss
-        losses = sum(loss for loss in loss_dict.values())
+        losses = loss_dict['classification_loss'] + loss_dict['regression_loss']
         return {"loss": losses, "log": loss_dict, "progress_bar": loss_dict}
 
     def validation_step(self, batch, batch_idx, *args, **kwargs):
@@ -269,7 +268,6 @@ class LitModel(pl.LightningModule):
     def validation_epoch_end(self, outputs):
         self.coco_evaluator.accumulate()
         self.coco_evaluator.summarize()
-
         # coco main metric
         metric = self.coco_evaluator.coco_eval["bbox"].stats[0]
         metric = torch.as_tensor(metric)
@@ -302,7 +300,7 @@ val_dl = DataLoader(val_ds, batch_size=VALID_BATCH_SIZE, shuffle=False, collate_
 # Training Options
 # --------------------------------------------------------------------------------------------------
 EPOCHS = 20
-MAX_LR = 3e-04
+MAX_LR = 3e-05
 WD = 1e-03
 
 # Optimzier and LrScheduler
@@ -320,16 +318,8 @@ early_stopping_callback = pl.callbacks.EarlyStopping(mode="max", monitor="bbox_I
 
 lightning_model = LitModel(model, optimizer, train_dl, val_dl, max_lr=MAX_LR)
 
-trainer = pl.Trainer(
-    logger=[tb_logger],
-    gradient_clip_val=0.5,
-    checkpoint_callback=checkpoint_callback,
-    max_epochs=EPOCHS,
-    precision=16,
-    gpus=1,
-    accumulate_grad_batches=5,
-    num_sanity_val_steps=0,
-)
+trainer = pl.Trainer(logger=[tb_logger], gradient_clip_val=0.1, checkpoint_callback=checkpoint_callback,
+                     max_epochs=EPOCHS, precision=16, gpus=1, accumulate_grad_batches=0,num_sanity_val_steps=0)
 
 trainer.fit(lightning_model)
 
