@@ -2,6 +2,7 @@ import importlib
 import math
 from typing import *
 import torch
+from torch import flatten
 from torch.functional import Tensor
 
 from .config import *
@@ -40,49 +41,19 @@ def load_obj(obj_path: str, default_obj_path: str = "") -> Any:
     return getattr(module_obj, obj_name)
 
 
-def bbox_2_activ(ground_truth_boxes: Tensor, anchors: Tensor) -> Tensor:
+def bbox_2_activ(bboxes: Tensor, anchors: Tensor) -> Tensor:
     """
     Convert `ground_truths` to match the model `activations` to calculate `loss`.
     """
-    if anchors.device != ground_truth_boxes.device:
-        anchors.to(ground_truth_boxes.device)
+    if anchors.device != bboxes.device:
+        anchors.to(bboxes.device)
 
-    # Unpack Elements
-    anchors_x1 = anchors[:, 0].unsqueeze(1)
-    anchors_y1 = anchors[:, 1].unsqueeze(1)
-    anchors_x2 = anchors[:, 2].unsqueeze(1)
-    anchors_y2 = anchors[:, 3].unsqueeze(1)
-
-    ground_truths_x1 = ground_truth_boxes[:, 0].unsqueeze(1)
-    ground_truths_y1 = ground_truth_boxes[:, 1].unsqueeze(1)
-    ground_truths_x2 = ground_truth_boxes[:, 2].unsqueeze(1)
-    ground_truths_y2 = ground_truth_boxes[:, 3].unsqueeze(1)
-
-    # Calculate width, height, center_x, center_y
-    w = anchors_x2 - anchors_x1
-    h = anchors_y2 - anchors_y1
-    x = anchors_x1 + 0.5 * w
-    y = anchors_y1 + 0.5 * h
-
-    gt_w = ground_truths_x2 - ground_truths_x1
-    gt_h = ground_truths_y2 - ground_truths_y1
-    gt_x = ground_truths_x1 + 0.5 * gt_w
-    gt_y = ground_truths_y1 + 0.5 * gt_h
-
-    # Calculate Offsets
-    dtype, device = anchors.dtype, anchors.device
-    dx = (torch.as_tensor(BBOX_REG_WEIGHTS[0], dtype=dtype, device=device) * (gt_x - x)/ w)
-    dy = (torch.as_tensor(BBOX_REG_WEIGHTS[1], dtype=dtype, device=device) * (gt_y - y)/ h)
-    dw = torch.as_tensor(BBOX_REG_WEIGHTS[2],  dtype=dtype, device=device) * torch.log(gt_w / w)
-    dh = torch.as_tensor(BBOX_REG_WEIGHTS[3],  dtype=dtype, device=device) * torch.log(gt_h / h)
-
-    targets = torch.cat((dx, dy, dw, dh), dim=1)
-    return targets
-
+    t_centers = (bboxes[...,:2] - anchors[...,:2]) / anchors[...,2:] 
+    t_sizes = torch.log(bboxes[...,2:] / anchors[...,2:] + 1e-8) 
+    return torch.cat([t_centers, t_sizes], -1).div_(bboxes.new_tensor([BBOX_REG_WEIGHTS]))
 
 def activ_2_bbox(activations: Tensor, anchors: Tensor):
     "Converts the `activations` of the `model` to bounding boxes."
-
     # Gather in the same device
     if anchors.device != activations.device:
         anchors = anchors.to(activations.device)
@@ -92,11 +63,9 @@ def activ_2_bbox(activations: Tensor, anchors: Tensor):
     centers = anchors[...,2:] * activations[...,:2] + anchors[...,:2]
     sizes = anchors[...,2:] * torch.exp(activations[...,:2])
     boxes = torch.cat([centers, sizes], -1)
-
     # Convert bbox shape from xywh to x1y1x2y2
     top_left = boxes[:,:2] - boxes[:,2:]/2
     bot_right = boxes[:,:2] + boxes[:,2:]/2
-
     return torch.cat([top_left, bot_right], 1)
 
 def matcher(anchors: Tensor, targets: Tensor, match_thr: float = None, back_thr: float = None):
@@ -115,10 +84,9 @@ def matcher(anchors: Tensor, targets: Tensor, match_thr: float = None, back_thr:
     assert (match_thr > back_thr)
 
     matches = anchors.new(anchors.size(0)).zero_().long() - 2
-
     if targets.numel() == 0:
         return matches
-
+        
     # Calculate IOU between given targets & anchors
     iou_vals = compute_IOU(anchors, targets)
     # Grab the best ground_truth overlap
