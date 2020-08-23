@@ -47,7 +47,7 @@ class RetinaNetLosses(nn.Module):
         clas_mask = matches >= 0
         clas_pred = clas_pred[clas_mask]
         # Build targets : 
-        # Since targets do not have background class add 0 for the back ground class to the clas_tgt
+        # Add backgorund class at the index
         clas_tgt  = torch.cat([clas_tgt.new_zeros(1).long(), clas_tgt])
         # filter clas_targets
         clas_tgt  = clas_tgt[matches[clas_mask]]
