@@ -49,9 +49,10 @@ class RetinaNetLosses(nn.Module):
         # Build targets : 
         # Since targets do not have background class add 0 for the back ground class to the clas_tgt
         clas_tgt  = torch.cat([clas_tgt.new_zeros(1).long(), clas_tgt])
+        # filter clas_targets
         clas_tgt  = clas_tgt[matches[clas_mask]]
         # one hot the class targets
-        clas_tgt  = encode_class(clas_tgt, self.n_c)
+        clas_tgt  = encode_class(clas_tgt, clas_pred.size(1))
         clas_loss = self.focal_loss(clas_pred, clas_tgt) / torch.clamp(bbox_mask.sum(), min=1.0)
         return clas_loss, bb_loss
 
@@ -81,6 +82,11 @@ def encode_class(idxs, n_classes):
     We will one-hot encode our targets with the convention
     that the class of index 0 is the background,
     which is the absence of any other classes.
+    
+    Arguments:
+    --------
+        idxs:  Tensor original class_targets with background class at index 0.
+        n_classes: Number of classes
     """
     target = idxs.new_zeros(len(idxs), n_classes).float()
     mask = idxs != 0
