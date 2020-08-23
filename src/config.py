@@ -48,8 +48,8 @@ BBOX_REG_WEIGHTS: List[float] = [0.1, 0.1, 0.2, 0.2]
 # -----------------------------------------------------------------------------
 # `RetinaNet` Options
 # -----------------------------------------------------------------------------
-NUM_CLASSES: int = 80
-# number of output classes of the model(excluding the background).
+NUM_CLASSES: int = 81
+# number of output classes of the model(including the background).
 # `-1` will always be the background class. Target values should have values starting from 0
 
 # The network used to compute the features for the model.

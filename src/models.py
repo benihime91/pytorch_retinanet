@@ -43,7 +43,8 @@ class Retinanet(nn.Module):
         - scores (Tensor[N]): the scores or each prediction
 
     Arguments:
-        - num_classes   (int): number of output classes of the model (excluding the background).
+        - num_classes   (int): number of output classes of the model (including the background).
+                               0 is the background class.
         - backbone_kind (str): the network used to compute the features for the model. 
                                currently support only `Resnet` networks.
         - prior       (float): Prior prob for rare case (i.e. foreground) at the beginning of training.
@@ -168,13 +169,11 @@ class Retinanet(nn.Module):
             all_boxes = []
             all_scores = []
             all_labels = []
-
+            ########### nms for each class ############
             for cls_idx in range(num_classes):
                 # remove low scoring boxes
                 lw_idx = torch.gt(sc_per_im[:, cls_idx], self.score_thres)
-                bb_per_cls, sc_per_cls, lbl_per_cls = (
-                    bb_per_im[lw_idx], sc_per_im[lw_idx, cls_idx], lbl_per_im[lw_idx, cls_idx]
-                    )
+                bb_per_cls, sc_per_cls, lbl_per_cls = (bb_per_im[lw_idx], sc_per_im[lw_idx, cls_idx], lbl_per_im[lw_idx, cls_idx])
                 # remove empty boxes
                 mask = remove_small_boxes(bb_per_cls, min_size=1e-2)
                 bb_per_cls, sc_per_cls, lbl_per_cls = (bb_per_cls[mask], sc_per_cls[mask], lbl_per_cls[mask])
@@ -186,6 +185,7 @@ class Retinanet(nn.Module):
                 all_boxes.append(bb_per_cls)
                 all_scores.append(sc_per_cls)
                 all_labels.append(lbl_per_cls)
+            # Append all results to `final detections`
             final_detections.append(
                 {
                     "boxes": torch.cat(all_boxes, dim=0),

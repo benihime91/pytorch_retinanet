@@ -21,9 +21,6 @@ Original file is located at
 # # pip install -U bounding_box --quiet
 # # echo " >> Libraries successfully installed !"
 
-# Commented out IPython magic to ensure Python compatibility.
-import os
-
 # RetinaNet Imports
 from src.models import Retinanet
 from src.eval_utils.coco_eval import CocoEvaluator
@@ -33,11 +30,9 @@ from src.eval_utils.coco_utils import get_coco_api_from_dataset
 import pytorch_lightning as pl
 
 import torch
-import torchvision
 from torch import nn
 from torch import optim
 from torch.utils.data import Dataset, DataLoader
-from bounding_box import bounding_box as bb
 import cv2
 import pandas as pd
 import numpy as np
@@ -50,8 +45,6 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 pl.seed_everything(123)
-warnings.filterwarnings("ignore")
-pd.set_option("display.max_colwidth", None, "display.max_rows", None)
 
 # --------------------------------------------------------------------------------------------------
 # IMAGE PATHS
