@@ -98,22 +98,11 @@ le = preprocessing.LabelEncoder()
 df["target"] = le.fit_transform(df["class"].values) + 1
 # 3. Shuffle the dataFrame
 df = df.sample(frac=1).reset_index(drop=True)
-
-
 # Take a small subset to train
-df, _ = model_selection.train_test_split(
-    df, stratify=df.target, test_size=0.5, shuffle=True
-)
+df, _ = model_selection.train_test_split(df, stratify=df.target, test_size=0.5, shuffle=True)
 df.reset_index(drop=True, inplace=True)
-
-
-df_train, df_test = model_selection.train_test_split(
-    df, stratify=df["target"], test_size=0.25, shuffle=True
-)
-
+df_train, df_test = model_selection.train_test_split(df, stratify=df["target"], test_size=0.25, shuffle=True)
 df_train.reset_index(drop=True, inplace=True)
-
-
 df_test.reset_index(drop=True, inplace=True)
 
 
@@ -178,27 +167,21 @@ class Dataset(torch.utils.data.Dataset):
         # Grab the Image
         image_id = self.image_ids[idx]
         im = cv2.cvtColor(cv2.imread(image_id), cv2.COLOR_BGR2RGB)
-
         # extract the bounding boxes
         records = self.df[self.df["filename"] == image_id]
         boxes = records[["xmin", "ymin", "xmax", "ymax"]].values
-
         # claculate area
         area = (boxes[:, 3] - boxes[:, 1]) * (boxes[:, 2] - boxes[:, 0])
         area = torch.as_tensor(area, dtype=torch.float32)
-
         # Grab the Class Labels
         class_labels = records["target"].values.tolist()
-
         # suppose all instances are not crowd
         iscrowd = torch.zeros((records.shape[0],), dtype=torch.int64)
-
         # apply transformations
         transformed = self.tfms(image=im, bboxes=boxes, class_labels=class_labels)
         image = transformed["image"]
         boxes = torch.tensor(transformed["bboxes"], dtype=torch.float32)
         class_labels = torch.tensor(transformed["class_labels"])
-
         # target dictionary
         target = {}
         image_idx = torch.tensor([idx])
@@ -207,7 +190,6 @@ class Dataset(torch.utils.data.Dataset):
         target["labels"] = class_labels
         target["area"] = area
         target["iscrowd"] = iscrowd
-
         return image, target, image_idx
 
 
@@ -261,7 +243,6 @@ class LitModel(pl.LightningModule):
 
     def val_dataloader(self, *args, **kwargs):
         valid_loader = self.val_dl
-
         # Prepare COCO Evaluator
         coco = get_coco_api_from_dataset(valid_loader.dataset)
         iou_types = ["bbox"]
@@ -281,12 +262,8 @@ class LitModel(pl.LightningModule):
         images, targets, _ = batch
         targets = [{k: v for k, v in t.items()} for t in targets]
         outputs = self.model(images, targets)
-        res = {
-            target["image_id"].item(): output
-            for target, output in zip(targets, outputs)
-        }
+        res = {target["image_id"].item(): output for target, output in zip(targets, outputs)}
         self.coco_evaluator.update(res)
-
         return {}
 
     def validation_epoch_end(self, outputs):
@@ -297,12 +274,7 @@ class LitModel(pl.LightningModule):
         metric = self.coco_evaluator.coco_eval["bbox"].stats[0]
         metric = torch.as_tensor(metric)
         tensorboard_logs = {"bbox_IOU": metric}
-        return {
-            "val_loss": metric,
-            "log": tensorboard_logs,
-            "progress_bar": tensorboard_logs,
-        }
-
+        return {"val_loss": metric, "log": tensorboard_logs, "progress_bar": tensorboard_logs,}
 
 ###################################### Training Configurations #####################################
 
@@ -310,11 +282,7 @@ class LitModel(pl.LightningModule):
 # Model
 # --------------------------------------------------------------------------------------------------
 # unique classes + 1: for background
-model = Retinanet(
-    num_classes=len(df["target"].unique()) + 1,
-    backbone_kind="resnet50",
-    pretrained=True,
-)
+model = Retinanet( num_classes=len(df["target"].unique()) + 1, backbone_kind="resnet50", pretrained=True)
 
 # --------------------------------------------------------------------------------------------------
 # Inputs
@@ -324,46 +292,21 @@ VALID_BATCH_SIZE = 12
 
 # Train DataLoader
 train_ds = Dataset(df_train, train=True)
-train_dl = DataLoader(
-    train_ds,
-    batch_size=TRAIN_BATCH_SIZE,
-    shuffle=True,
-    collate_fn=collate_fn,
-    pin_memory=True,
-)
+train_dl = DataLoader(train_ds, batch_size=TRAIN_BATCH_SIZE, shuffle=True, collate_fn=collate_fn, pin_memory=True,)
 
 # Valid DataLoader
 val_ds = Dataset(df_test, train=False)
-val_dl = DataLoader(
-    val_ds,
-    batch_size=VALID_BATCH_SIZE,
-    shuffle=False,
-    collate_fn=collate_fn,
-    pin_memory=True,
-)
-
+val_dl = DataLoader(val_ds, batch_size=VALID_BATCH_SIZE, shuffle=False, collate_fn=collate_fn, pin_memory=True,)
 
 # --------------------------------------------------------------------------------------------------
 # Training Options
 # --------------------------------------------------------------------------------------------------
 EPOCHS = 20
-MAX_LR = 1e-03
-WD = 1e-02
+MAX_LR = 3e-04
+WD = 1e-03
 
 # Optimzier and LrScheduler
-optimizer = optim.SGD(
-    [p for p in model.parameters() if p.requires_grad],
-    lr=MAX_LR,
-    momentum=0.9,
-    weight_decay=WD,
-)
-
-lr_scheduler = {
-    "scheduler": optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.9),
-    "step": "epoch",
-}
-
-
+optimizer = optim.Adam([p for p in model.parameters() if p.requires_grad], lr=MAX_LR, betas=(0.9, 0.99))
 # --------------------------------------------------------------------------------------------------
 # PyTorch-Lightning CallBacks
 # --------------------------------------------------------------------------------------------------
@@ -371,25 +314,20 @@ tb_logger = pl.loggers.TensorBoardLogger(save_dir="/content/logs")
 # TensorBoard Logger
 
 # CheckPoint Logger
-checkpoint_callback = pl.callbacks.ModelCheckpoint(
-    "content/saved_models", mode="max", monitor="bbox_IOU", save_top_k=-1
-)
-
+checkpoint_callback = pl.callbacks.ModelCheckpoint("content/saved_models", mode="max", monitor="bbox_IOU", save_top_k=-1)
 # EarlyStopping Callback
-early_stopping_callback = pl.callbacks.EarlyStopping(
-    mode="max", monitor="bbox_IOU", patience=5
-)
+early_stopping_callback = pl.callbacks.EarlyStopping(mode="max", monitor="bbox_IOU", patience=5)
 
-lightning_model = LitModel(
-    model, optimizer, train_dl, val_dl, max_lr=MAX_LR, scheduler=lr_scheduler
-)
+lightning_model = LitModel(model, optimizer, train_dl, val_dl, max_lr=MAX_LR)
 
 trainer = pl.Trainer(
     logger=[tb_logger],
     gradient_clip_val=0.5,
     checkpoint_callback=checkpoint_callback,
     max_epochs=EPOCHS,
+    precision=16,
     gpus=1,
+    accumulate_grad_batches=5,
     num_sanity_val_steps=0,
 )
 

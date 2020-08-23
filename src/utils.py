@@ -123,10 +123,7 @@ def compute_IOU(anchors, targets):
 def intersection(anchors, targets):
     "Compute the sizes of the intersections of `anchors` by `targets`."
     a, t       = anchors.size(0), targets.size(0)
-    ancs, tgts = (
-        anchors.unsqueeze(1).expand(a, t, 4),
-        targets.unsqueeze(0).expand(a, t, 4),
-    )
+    ancs, tgts = (anchors.unsqueeze(1).expand(a, t, 4), targets.unsqueeze(0).expand(a, t, 4))
     top_left_i  = torch.max(ancs[..., :2], tgts[..., :2])
     bot_right_i = torch.min(ancs[..., 2:], tgts[..., 2:])
     sizes       = torch.clamp(bot_right_i - top_left_i, min=0)
