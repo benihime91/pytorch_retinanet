@@ -390,7 +390,7 @@ trainer = pl.Trainer(
     checkpoint_callback=checkpoint_callback,
     max_epochs=EPOCHS,
     gpus=1,
-    num_sanity_val_steps=2,
+    num_sanity_val_steps=0,
 )
 
 trainer.fit(lightning_model)
