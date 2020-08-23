@@ -47,7 +47,16 @@ def bbox_2_activ(bboxes: Tensor, anchors: Tensor) -> Tensor:
     """
     if anchors.device != bboxes.device:
         anchors.to(bboxes.device)
+    # convert anchors & targets from tlbr to cthw
+    a_centers = (anchors[:,:2] + anchors[:,2:])/2
+    a_sizes   = anchors[:,2:] - anchors[:,:2]
+    anchors   = torch.cat([a_centers, a_sizes], 1)
 
+    b_centers = (bboxes[:,:2] + bboxes[:,2:])/2
+    b_sizes   = bboxes[:, 2:] - bboxes[:, :2]
+    bboxes    = torch.cat([b_centers, b_sizes], 1)
+
+    # Calculate Offsets
     t_centers = (bboxes[...,:2] - anchors[...,:2]) / anchors[...,2:] 
     t_sizes = torch.log(bboxes[...,2:] / anchors[...,2:] + 1e-8) 
     return torch.cat([t_centers, t_sizes], -1).div_(bboxes.new_tensor([BBOX_REG_WEIGHTS]))
@@ -58,14 +67,19 @@ def activ_2_bbox(activations: Tensor, anchors: Tensor):
     if anchors.device != activations.device:
         anchors = anchors.to(activations.device)
 
-    # Convert anchor format from XYXY to XYWH
+    a_centers = (anchors[:,:2] + anchors[:,2:])/2
+    a_sizes   = anchors[:,2:] - anchors[:,:2]
+    anchors   = torch.cat([a_centers, a_sizes], 1)
+
     activations.mul_(activations.new_tensor([BBOX_REG_WEIGHTS]))
     centers = anchors[...,2:] * activations[...,:2] + anchors[...,:2]
-    sizes = anchors[...,2:] * torch.exp(activations[...,:2])
-    boxes = torch.cat([centers, sizes], -1)
+    sizes   = anchors[...,2:] * torch.exp(activations[...,:2])
+    boxes   = torch.cat([centers, sizes], -1)
+    
     # Convert bbox shape from xywh to x1y1x2y2
-    top_left = boxes[:,:2] - boxes[:,2:]/2
+    top_left  = boxes[:,:2] - boxes[:,2:]/2
     bot_right = boxes[:,:2] + boxes[:,2:]/2
+    
     return torch.cat([top_left, bot_right], 1)
 
 def matcher(anchors: Tensor, targets: Tensor, match_thr: float = None, back_thr: float = None):
@@ -86,7 +100,7 @@ def matcher(anchors: Tensor, targets: Tensor, match_thr: float = None, back_thr:
     matches = anchors.new(anchors.size(0)).zero_().long() - 2
     if targets.numel() == 0:
         return matches
-        
+
     # Calculate IOU between given targets & anchors
     iou_vals = compute_IOU(anchors, targets)
     # Grab the best ground_truth overlap
