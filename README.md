@@ -15,8 +15,8 @@ A simple implementations of `Retinanet` for `object detection` as described in t
 - [x] Assemble Retinanet Using `BackBone` => `FPN` => `AnchorGenerator` => `Regeression` & `Classification` Head.
 - [x] Decode `Retinanet Predictions`. 
 - [x] Create `Dataset` for Loading Custom Data. [Preferably from CSV].
-- [x] `Trainer` from `PyTorch Lightning`.
 - [x] Fix `cuda` errors in losses.py
-- [ ] Check `Training`. [Failing: in losses.py : cuda error]
-- [ ] Scripts for `training` & `inference`.
+- [x] Check `Training`. [Failing: in losses.py : cuda error]
+- [ ] `Trainer` from `PyTorch Lightning`.
+- [ ] Working Scripts for `training` & `inference`.
 - [x] Evaluation using `COCO API`. (scripts taken from: https://github.com/PyTorchLightning/wheat )
