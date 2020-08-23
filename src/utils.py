@@ -47,14 +47,15 @@ def bbox_2_activ(bboxes: Tensor, anchors: Tensor) -> Tensor:
     """
     if anchors.device != bboxes.device:
         anchors.to(bboxes.device)
+        
     # convert anchors & targets from tlbr to cthw
     a_centers = (anchors[:,:2] + anchors[:,2:])/2
     a_sizes   = anchors[:,2:] - anchors[:,:2]
-    anchors   = torch.cat([a_centers, a_sizes], 1)
 
     b_centers = (bboxes[:,:2] + bboxes[:,2:])/2
     b_sizes   = bboxes[:, 2:] - bboxes[:, :2]
-    bboxes    = torch.cat([b_centers, b_sizes], 1)
+
+    anchors , bboxes  = torch.cat([a_centers, a_sizes], 1), torch.cat([b_centers, b_sizes], 1)
 
     # Calculate Offsets
     t_centers = (bboxes[...,:2] - anchors[...,:2]) / anchors[...,2:] 
@@ -66,17 +67,17 @@ def activ_2_bbox(activations: Tensor, anchors: Tensor):
     # Gather in the same device
     if anchors.device != activations.device:
         anchors = anchors.to(activations.device)
-
+    # Convert anchors from tlbr to cthw
     a_centers = (anchors[:,:2] + anchors[:,2:])/2
     a_sizes   = anchors[:,2:]  - anchors[:,:2]
     anchors   = torch.cat([a_centers, a_sizes], 1)
 
-    activations.mul_(activations.new_tensor([BBOX_REG_WEIGHTS]))
-    centers = anchors[...,2:] * activations[...,:2] + anchors[...,:2]
-    sizes   = anchors[...,2:] * torch.exp(activations[...,:2])
+    activations.mul_(activations.new_tensor([BBOX_REG_WEIGHTS])) # multiply activation with weights
+    centers = anchors[...,2:] * activations[...,:2] + anchors[...,:2] # calculate x,y center offsets
+    sizes   = anchors[...,2:] * torch.exp(activations[...,:2])  # calcualte height & width
     boxes   = torch.cat([centers, sizes], -1)
     
-    # Convert bbox shape from xywh to x1y1x2y2
+    # Convert bbox shape from cthw to tlbr
     top_left  = boxes[:,:2] - boxes[:,2:]/2
     bot_right = boxes[:,:2] + boxes[:,2:]/2
     

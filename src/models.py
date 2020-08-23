@@ -160,10 +160,10 @@ class Retinanet(nn.Module):
         labels = labels.view(1, -1).expand_as(scores)
         final_detections = []
         for bb_per_im, sc_per_im, lbl_per_im, anc_per_im, im_sz in zip(bbox_preds, scores, labels, anchors, im_szs):
-            # Convert the activations: outputs from the model in bboxes
-            boxes_per_image = activ_2_bbox(bb_per_im, anc_per_im)
+            # Convert the activations: outputs from the model to bboxes
+            bb_per_im = activ_2_bbox(bb_per_im, anc_per_im)
             # clip boxes to image size
-            boxes_per_image = clip_boxes_to_image(boxes_per_image, im_sz)
+            bb_per_im = clip_boxes_to_image(bb_per_im, im_sz)
 
             all_boxes = []
             all_scores = []
@@ -173,7 +173,7 @@ class Retinanet(nn.Module):
                 # remove low scoring boxes
                 lw_idx = torch.gt(sc_per_im[:, cls_idx], self.score_thres)
                 bb_per_cls, sc_per_cls, lbl_per_cls = (
-                    boxes_per_image[lw_idx], sc_per_im[lw_idx, cls_idx], lbl_per_im[lw_idx, cls_idx]
+                    bb_per_im[lw_idx], sc_per_im[lw_idx, cls_idx], lbl_per_im[lw_idx, cls_idx]
                     )
                 # remove empty boxes
                 mask = remove_small_boxes(bb_per_cls, min_size=1e-2)
