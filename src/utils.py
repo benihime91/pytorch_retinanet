@@ -68,7 +68,7 @@ def activ_2_bbox(activations: Tensor, anchors: Tensor):
         anchors = anchors.to(activations.device)
 
     a_centers = (anchors[:,:2] + anchors[:,2:])/2
-    a_sizes   = anchors[:,2:] - anchors[:,:2]
+    a_sizes   = anchors[:,2:]  - anchors[:,:2]
     anchors   = torch.cat([a_centers, a_sizes], 1)
 
     activations.mul_(activations.new_tensor([BBOX_REG_WEIGHTS]))
