@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 from torch.functional import Tensor
 from torchvision.models.detection.transform import GeneralizedRCNNTransform
-from torchvision.ops.boxes import clip_boxes_to_image, nms, remove_small_boxes
+from torchvision.ops.boxes import batched_nms, clip_boxes_to_image, remove_small_boxes
 
 from .anchors import AnchorGenerator
 from .backbone import get_backbone
@@ -14,9 +14,6 @@ from .utils import activ_2_bbox, ifnone
 
 __small__ = ["resnet18", "resnet34"]
 __big__ = ["resnet50", "resnet101", "resnet101", "resnet152"]
-
-
-# TODO: Check `Process Detections`
 
 
 class Retinanet(nn.Module):
@@ -174,70 +171,77 @@ class Retinanet(nn.Module):
         anchors: List[Tensor],
         im_szs: List[Tuple[int, int]],
     ):
+        "Process `outputs` and return the predicted bboxes, score, clas_labels above `detect_thresh`."
+
         class_logits = outputs.pop("cls_preds")
         bbox_preds = outputs.pop("bbox_preds")
-        scores = torch.sigmoid(class_logits)
-        device = class_logits.device
-        num_classes = class_logits.shape[-1]
-        # create labels for each score
-        labels = torch.arange(num_classes, device=device)
-        labels = labels.view(1, -1).expand_as(scores)
 
+        # Get the predicitons from the clas_logits
+        scores = torch.sigmoid(class_logits)
+
+        device = class_logits.device
+        # Total number of classes(including the background clas)
+        num_classes = class_logits.shape[-1]
+
+        all_boxes = []
+        all_scores = []
+        all_labels = []
         final_detections = []
 
-        for bb_per_im, sc_per_im, lbl_per_im, anc_per_im, im_sz in zip(
-            bbox_preds, scores, labels, anchors, im_szs
+        for bb_per_im, sc_per_im, anc_per_im, im_sz in zip(
+            bbox_preds, scores, anchors, im_szs
         ):
             # Convert the activations: outputs from the model to bboxes
             bb_per_im = activ_2_bbox(bb_per_im, anc_per_im)
             # clip boxes to image size
             bb_per_im = clip_boxes_to_image(bb_per_im, im_sz)
 
-            all_boxes = []
-            all_scores = []
-            all_labels = []
+            # create labels for each score: [0, num_classes]
+            labels = torch.arange(num_classes, device=device)
+            labels = labels.view(1, -1).expand_as(scores)
 
-            # do nms for each class
-            for cls_idx in range(num_classes):
-                # Gather the low scoring idxs
-                lw_idx = torch.gt(sc_per_im[:, cls_idx], self.score_thres)
-                # Filter low scoring predicitons
-                bb_per_cls, sc_per_cls, lbl_per_cls = (
-                    bb_per_im[lw_idx],
-                    sc_per_im[lw_idx, cls_idx],
-                    lbl_per_im[lw_idx, cls_idx],
-                )
+            # Remove predictions with background label
+            bb_per_im = bb_per_im[:, 1:]
+            sc_per_im = sc_per_im[:, 1:]
+            labels = labels[:, 1:]
 
-                # remove empty boxes
-                mask = remove_small_boxes(bb_per_cls, min_size=1e-2)
-                bb_per_cls, sc_per_cls, lbl_per_cls = (
-                    bb_per_cls[mask],
-                    sc_per_cls[mask],
-                    lbl_per_cls[mask],
-                )
+            # Batch all the parameters
+            bb_per_im = bb_per_im.reshape(1, 4)
+            sc_per_im = sc_per_im.reshape(-1)
+            labels = labels.reshape(-1)
 
-                # non-maximum suppression, independently done per class
-                mask = nms(bb_per_cls, sc_per_cls, self.nms_thres)
-
-                # mask only topk scoring predictions
-                mask = mask[: self.detections_per_img]
-                bb_per_cls, sc_per_cls, lbl_per_cls = (
-                    bb_per_cls[mask],
-                    sc_per_cls[mask],
-                    lbl_per_cls[mask],
-                )
-
-                all_boxes.append(bb_per_cls)
-                all_scores.append(sc_per_cls)
-                all_labels.append(lbl_per_cls)
-            # Append all results to `final detections`
-            final_detections.append(
-                {
-                    "boxes": torch.cat(all_boxes, dim=0),
-                    "scores": torch.cat(all_scores, dim=0),
-                    "labels": torch.cat(all_labels, dim=0),
-                }
+            # Remove low scoring boxes
+            inds = torch.nonzero(scores > self.score_thres).squeeze(1)
+            bb_per_im, sc_per_im, labels = (
+                bb_per_im[inds],
+                sc_per_im[inds],
+                labels[inds],
             )
+            # Remove empty boxes
+            keep = remove_small_boxes(bb_per_im, min_size=1e-02)
+
+            # Non max superssion
+            keep = batched_nms(bb_per_im, sc_per_im, labels, self.nms_thres)
+            # keep only topk scoring predictions
+            keep = keep[: self.detections_per_img]
+            bb_per_im, sc_per_im, labels = (
+                bb_per_im[keep],
+                sc_per_im[keep],
+                labels[keep],
+            )
+
+            all_boxes.append(bb_per_im)
+            all_scores.append(sc_per_im)
+            all_labels.append(labels)
+
+        # Append all results to `final detections`
+        final_detections.append(
+            {
+                "boxes": torch.cat(all_boxes, dim=0),
+                "scores": torch.cat(all_scores, dim=0),
+                "labels": torch.cat(all_labels, dim=0),
+            }
+        )
 
         return final_detections
 
