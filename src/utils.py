@@ -54,7 +54,7 @@ def convert_cthw_2_tlbr(boxes:Tensor)->Tensor:
     return torch.cat([top_left, bot_right], 1)
 
 
-def bbox_to_activ(bboxes: Tensor, anchors: Tensor) -> Tensor:
+def bbox_2_activ(bboxes: Tensor, anchors: Tensor) -> Tensor:
     "Return the target of the model on `anchors` for the `bboxes`."
     # Anchors & bboxes are of the forms : XYXY
     # Convert to XYWH
