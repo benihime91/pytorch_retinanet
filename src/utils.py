@@ -46,8 +46,7 @@ def bbox_2_activ(bboxes: Tensor, anchors: Tensor) -> Tensor:
     Convert `ground_truths` to match the model `activations` to calculate `loss`.
     """
     if anchors.device != bboxes.device:
-        anchors.to(bboxes.device)
-    
+        anchors.to(bboxes.device)    
     # Unpack elements
     anchor_x1 = anchors[:,0].unsqueeze(1)
     anchor_x2 = anchors[:,1].unsqueeze(1)
@@ -59,36 +58,37 @@ def bbox_2_activ(bboxes: Tensor, anchors: Tensor) -> Tensor:
     bbox_y1 = bboxes[:,2].unsqueeze(1)
     bbox_y2 = bboxes[:,3].unsqueeze(1)  
 
-    # Convert from tlbr to cthw
+    # Convert top/left bottom/right format `boxes` to center/corners.
     a_width    = anchor_x2 - anchor_x1
     a_height   = anchor_y2 - anchor_y1
-    a_center_x = anchor_x1 + 0.5 * a_width
-    a_center_y = anchor_y1 + 0.5 * a_height
+    a_center_x = anchor_x1 + a_width/2
+    a_center_y = anchor_y1 + a_height/2
 
     b_width    = bbox_x2 - bbox_x1
     b_height   = bbox_y2 - bbox_y1
-    b_center_x = bbox_x1 + 0.5 * b_width
-    b_center_y = bbox_y1 + 0.5 * b_height
+    b_center_x = bbox_x1 + b_width/2
+    b_center_y = bbox_y1 + b_height/2
     
     # Compute Offsets
     t_x = (b_center_x - a_center_x)/a_width
     t_y = (b_center_y - a_center_y)/a_height
-    t_w = torch.log(b_width / a_width + 1e-08)
-    t_h = torch.log(b_height / a_height + 1e-08)
-    return torch.cat((t_x, t_y, t_w, t_h), 1).div_(bboxes.new_tensor([BBOX_REG_WEIGHTS]))
+    t_w = torch.log(b_width / a_width)
+    t_h = torch.log(b_height / a_height)
+
+    return torch.cat((t_x, t_y, t_w, t_h), 1).mul_(bboxes.new_tensor([BBOX_REG_WEIGHTS]))
 
 def activ_2_bbox(activations: Tensor, anchors: Tensor):
     "Converts the `activations` of the `model` to bounding boxes."
     # Gather in the same device
     if anchors.device != activations.device:
         anchors = anchors.to(activations.device)
-    # Convert anchors from tlbr to cthw
+    # Convert top/left bottom/right format `boxes` to center/corners.
     widths  = anchors[:, 2] - anchors[:, 0]
     heights = anchors[:, 3] - anchors[:, 1]
-    ctr_x   = anchors[:, 0] + 0.5 * widths
-    ctr_y   = anchors[:, 1] + 0.5 * heights
+    ctr_x   = anchors[:, 0] + widths/2
+    ctr_y   = anchors[:, 1] + heights/2
 
-    activations.mul_(activations.new_tensor([BBOX_REG_WEIGHTS]))  # multiply activation with weights
+    activations.div_(activations.new_tensor([BBOX_REG_WEIGHTS]))  # multiply activation with weights
     dx = activations[:, 0::4]
     dy = activations[:, 1::4]
     dw = activations[:, 2::4]
@@ -105,10 +105,10 @@ def activ_2_bbox(activations: Tensor, anchors: Tensor):
     height = torch.exp(dh) * heights[:, None]
     
     # Convert from cthw to tlbr
-    bbox_1 = center_x - torch.tensor(0.5, dtype=center_x.dtype, device=width.device) * width
-    bbox_2 = center_y - torch.tensor(0.5, dtype=center_y.dtype, device=height.device) * height
-    bbox_3 = center_x + torch.tensor(0.5, dtype=center_x.dtype, device=width.device) * width
-    bbox_4 = center_y + torch.tensor(0.5, dtype=center_y.dtype, device=height.device) * height   
+    bbox_1 = center_x - width/2
+    bbox_2 = center_y - height/2
+    bbox_3 = center_x + width/2
+    bbox_4 = center_y + height/2   
     # Create the Predicitons
     bbox = torch.stack((bbox_1, bbox_2, bbox_3, bbox_4), dim=2).flatten(1)    
     return bbox
