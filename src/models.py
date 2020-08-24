@@ -135,7 +135,7 @@ class Retinanet(nn.Module):
         )
 
         # ------------------------------------------------------
-        # Parameters
+        # Model Parameters
         # ------------------------------------------------------
         self.score_thres = score_thres
         self.nms_thres = nms_thres
@@ -179,7 +179,9 @@ class Retinanet(nn.Module):
         # create labels for each score
         labels = torch.arange(num_classes, device=device)
         labels = labels.view(1, -1).expand_as(scores)
+
         final_detections = []
+
         for bb_per_im, sc_per_im, lbl_per_im, anc_per_im, im_sz in zip(
             bbox_preds, scores, labels, anchors, im_szs
         ):
@@ -191,15 +193,18 @@ class Retinanet(nn.Module):
             all_boxes = []
             all_scores = []
             all_labels = []
-            ########### nms for each class ############
+
+            # do nms for each class
             for cls_idx in range(num_classes):
-                # remove low scoring boxes
+                # Gather the low scoring idxs
                 lw_idx = torch.gt(sc_per_im[:, cls_idx], self.score_thres)
+                # Filter low scoring predicitons
                 bb_per_cls, sc_per_cls, lbl_per_cls = (
                     bb_per_im[lw_idx],
                     sc_per_im[lw_idx, cls_idx],
                     lbl_per_im[lw_idx, cls_idx],
                 )
+
                 # remove empty boxes
                 mask = remove_small_boxes(bb_per_cls, min_size=1e-2)
                 bb_per_cls, sc_per_cls, lbl_per_cls = (
@@ -207,8 +212,10 @@ class Retinanet(nn.Module):
                     sc_per_cls[mask],
                     lbl_per_cls[mask],
                 )
+
                 # non-maximum suppression, independently done per class
                 mask = nms(bb_per_cls, sc_per_cls, self.nms_thres)
+
                 # mask only topk scoring predictions
                 mask = mask[: self.detections_per_img]
                 bb_per_cls, sc_per_cls, lbl_per_cls = (
@@ -216,6 +223,7 @@ class Retinanet(nn.Module):
                     sc_per_cls[mask],
                     lbl_per_cls[mask],
                 )
+
                 all_boxes.append(bb_per_cls)
                 all_scores.append(sc_per_cls)
                 all_labels.append(lbl_per_cls)
@@ -231,6 +239,7 @@ class Retinanet(nn.Module):
         return final_detections
 
     def _get_outputs(self, losses, detections):
+        "if `training` return losses else return `detections`"
         if self.training:
             return losses
         else:
@@ -239,23 +248,31 @@ class Retinanet(nn.Module):
     def forward(
         self, images: List[Tensor], targets: Optional[List[Dict[str, Tensor]]] = None
     ):
+
         if self.training and targets is None:
-            raise ValueError("In training Model `targets` must be given")
+            raise ValueError("In training Model, `targets` must be given")
+
         # Grab the original Image sizes
         orig_im_szs = []
+
+        # store the original img szs
         for im in images:
             val = im.shape[-2:]
             assert len(val) == 2
             orig_im_szs.append((val[0], val[1]))
 
+        # Forward pass
         images, targets = self.transform_inputs(images, targets)
         feature_maps = self.backbone(images.tensors)
         fpn_outputs = self.fpn(feature_maps)
         anchors = self.anchor_generator(images, fpn_outputs)
         outputs = self.retinanet_head(fpn_outputs)
 
+        # Instatiate loss and detections dictionary
         losses = {}
         detections = torch.jit.annotate(List[Dict[str, Tensor]], [])
+
+        # Compute Loss or Detections
         if self.training:
             # Comput Loss
             losses = self.compute_loss(targets, outputs, anchors)
@@ -268,4 +285,5 @@ class Retinanet(nn.Module):
                 detections = self.transform_inputs.postprocess(
                     detections, images.image_sizes, orig_im_szs
                 )
+        # Return Outputs
         return self._get_outputs(losses, detections)
