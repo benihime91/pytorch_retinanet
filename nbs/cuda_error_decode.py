@@ -100,8 +100,8 @@ class Dataset(torch.utils.data.Dataset):
     def __init__(self, dataframe):
         self.df = dataframe
         self.image_ids = self.df["filename"]
-        self.tmfs = transforms
-
+        self.tfms = transforms
+        
     def __len__(self):
         return len(self.image_ids)
 
