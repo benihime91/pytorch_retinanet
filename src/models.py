@@ -16,6 +16,9 @@ __small__ = ["resnet18", "resnet34"]
 __big__ = ["resnet50", "resnet101", "resnet101", "resnet152"]
 
 
+# TODO: Check `Process Detections`
+
+
 class Retinanet(nn.Module):
     """
     Implement RetinaNet in :paper:`RetinaNet`.
