@@ -174,7 +174,7 @@ class Retinanet(nn.Module):
         "Process `outputs` and return the predicted bboxes, score, clas_labels above `detect_thresh`."
 
         class_logits = outputs.pop("cls_logits")
-        box_regression = outputs.pop("bbox_regression")
+        bboxes = outputs.pop("bbboxes")
 
         device = class_logits.device
         num_classes = class_logits.shape[-1]
@@ -187,7 +187,7 @@ class Retinanet(nn.Module):
         detections = torch.jit.annotate(List[Dict[str, Tensor]], [])
 
         for bb_per_im, sc_per_im, lbl_per_im, ancs_per_im, im_sz in zip(
-            box_regression, scores, labels, anchors, im_szs
+            bboxes, scores, labels, anchors, im_szs
         ):
 
             bb_per_im = activ_2_bbox(bb_per_im, ancs_per_im)
