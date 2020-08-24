@@ -13,22 +13,26 @@ class RetinaNetLosses(nn.Module):
     def __init__(self, num_classes) -> None:
         super(RetinaNetLosses, self).__init__()
         self.n_c = num_classes
+        self.alpha = FOCAL_LOSS_ALPHA
+        self.gamma = FOCAL_LOSS_GAMMA
 
-    def focal_loss(self, inputs: Tensor, targets: Tensor) -> Tensor:
+    def focal_loss(self, clas_pred: Tensor, clas_tgt: Tensor) -> Tensor:
         """
         Focal Loss
         """
-        alpha = FOCAL_LOSS_ALPHA
-        gamma = FOCAL_LOSS_GAMMA
-        ps = torch.sigmoid(inputs.detach())
-        weights = targets * (1 - ps) + (1 - targets) * ps
-        alphas = (1 - targets) * alpha + targets * (1 - alpha)
-        weights.pow_(gamma).mul_(alphas)
-        clas_loss = F.binary_cross_entropy_with_logits(inputs, targets, weights, reduction="sum")
+        encoded_tgt = encode_class(clas_tgt, clas_pred.size(1))
+        
+        ps = torch.sigmoid(clas_pred.detach())
+        weights = encoded_tgt * (1-ps) + (1-encoded_tgt) * ps
+        alphas = (1-encoded_tgt) * self.alpha + encoded_tgt * (1-self.alpha)
+        weights.pow_(self.gamma).mul_(alphas)
+        clas_loss = F.binary_cross_entropy_with_logits(clas_pred, encoded_tgt, weights, reduction='sum')
         return clas_loss
 
-    def calc_loss(self, anchors, clas_pred, bbox_pred, clas_tgt, bbox_tgt)->Tuple[Tensor, Tensor]:
+    def calc_loss(self, anchors, clas_pred, bbox_pred, clas_tgt, bbox_tgt, bg_clas=0)->Tuple[Tensor, Tensor]:
         """Calculate loss for class & box subnet of retinanet"""
+        i = torch.min(torch.nonzero(clas_tgt-bg_clas))
+        bbox_tgt, clas_tgt = bbox_tgt[i:], clas_tgt[i:]-1+bg_clas
         # Match boxes with anchors to get `background`, `ignore` and `foreground` positions
         matches   = matcher(anchors, bbox_tgt)
         # create filtering mask to filter `background` and `ignore` classes from the bboxes
@@ -43,7 +47,9 @@ class RetinaNetLosses(nn.Module):
             bb_loss = 0.0
 
         matches.add_(1)
+
         # filtering mask to filter `ignore` classes from the class predicitons
+        clas_tgt = clas_tgt + 1
         clas_mask = matches >= 0
         clas_pred = clas_pred[clas_mask]
         # Build targets : 
@@ -51,8 +57,6 @@ class RetinaNetLosses(nn.Module):
         clas_tgt  = torch.cat([clas_tgt.new_zeros(1).long(), clas_tgt])
         # filter clas_targets
         clas_tgt  = clas_tgt[matches[clas_mask]]
-        # one hot the class targets
-        clas_tgt  = encode_class(clas_tgt, clas_pred.size(1))
         clas_loss = self.focal_loss(clas_pred, clas_tgt) / torch.clamp(bbox_mask.sum(), min=1.0)
         return clas_loss, bb_loss
 
