@@ -190,7 +190,7 @@ class LitModel(pl.LightningModule):
         else:
             return [optimizer]
 
-    def optimizer_step(self, optimizer, *args, **kwargs):
+    def optimizer_step(self, *args, **kwargs):
         # warm up lr
         if self.trainer.global_step < 500:
             lr_scale = min(1., float(self.trainer.global_step + 1) / 500.)
@@ -247,9 +247,15 @@ TRAIN_BATCH_SIZE = 2
 VALID_BATCH_SIZE = 12
 EPOCHS = 26
 MAX_LR = 1e-04
-NUM_CLASSES = len(df['target']).unique() + 1    # len(df['target']).unique() classes + 1 background class
+NUM_CLASSES = len(df['target'].unique()) + 1    # len(df['target']).unique() classes + 1 background class
+print('[INFO] EPOCHS :', EPOCHS)
+print('[INFO] LEARNING_RATE :', MAX_LR)
+print('[INFO] NUM_CLASSES :', NUM_CLASSES)
 
-model = Retinanet(num_classes=38, backbone_kind="resnet50", pretrained=True, freeze_bn=True)
+model = Retinanet(num_classes=NUM_CLASSES,
+                  backbone_kind="resnet50",
+                  pretrained=True,
+                  freeze_bn=True)
 
 train_ds = Dataset(df_train, train=True)
 train_dl = DataLoader(train_ds, batch_size=TRAIN_BATCH_SIZE, shuffle=True, collate_fn=collate_fn, pin_memory=True,)
