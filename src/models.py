@@ -173,8 +173,8 @@ class Retinanet(nn.Module):
     ):
         "Process `outputs` and return the predicted bboxes, score, clas_labels above `detect_thresh`."
 
-        class_logits = outputs.pop("cls_logits")
-        bboxes = outputs.pop("bbboxes")
+        class_logits = outputs.pop("cls_preds")
+        bboxes = outputs.pop("bbox_preds")
 
         device = class_logits.device
         num_classes = class_logits.shape[-1]
@@ -197,15 +197,10 @@ class Retinanet(nn.Module):
             all_scores = []
             all_labels = []
 
-            # Remove predicitons with the backgorund label
-            bb_per_im = bb_per_im[:, 1:]
-            sc_per_im = sc_per_im[:, 1:]
-            lbl_per_im = lbl_per_im[:, 1:]
-
-            # No need to account for the background clas
+            # Loop over all classes from [1, num_classes)
             for class_index in range(1, num_classes):
-                # remove low scoring boxes
-                inds = torch.gt(sc_per_im[:, class_index], self.score_thresh)
+                # Grab the class_index in scores where scores is > score_thres
+                inds = torch.gt(sc_per_im[:, class_index], self.score_thres)
                 bb_per_cls, sc_per_cls, lbl_per_cls = (
                     bb_per_im[inds],
                     sc_per_im[inds, class_index],
@@ -221,7 +216,7 @@ class Retinanet(nn.Module):
                 )
 
                 # non-maximum suppression, independently done per class
-                keep = nms(bb_per_cls, sc_per_cls, self.nms_thresh)
+                keep = nms(bb_per_cls, sc_per_cls, self.nms_thres)
 
                 # keep only topk scoring predictions
                 keep = keep[: self.detections_per_img]
