@@ -252,9 +252,18 @@ def main(args):
     EPOCHS = args.epochs
     MAX_LR = args.lr
     NUM_CLASSES = len(df['target'].unique()) + 1    # len(df['target']).unique() classes + 1 background class
+    print('------------------------')
+    print('[INFO] ARGUMENTS: >>')
+    print('[INFO] BACKBONE:', args.model)
+    print('[INFO] EPOCHS:', args.epochs)
+    print('[INFO] LEARNING_RATE:', args.lr)
+    print('[INFO] WEIGHT_DECAY:', args.wd)
+    print('[INFO] MOMENTUM:', args.mom)
+    print('[INFO] PRECISION:', args.precision)
+    print('------------------------')
 
     model = Retinanet(num_classes=NUM_CLASSES,
-                      backbone_kind="resnet50",
+                      backbone_kind=args.model,
                       pretrained=True,
                       freeze_bn=True)
 
@@ -265,7 +274,8 @@ def main(args):
     val_dl = DataLoader(val_ds, batch_size=VALID_BATCH_SIZE, shuffle=False, collate_fn=collate_fn, pin_memory=True,)
 
     optimizer = optim.SGD([p for p in model.parameters() if p.requires_grad],
-                          lr=MAX_LR, momentum=0.9,
+                          lr=MAX_LR, 
+                          momentum=args.momentum,
                           weight_decay=args.wd)
 
     ###################################### Lightning Modules ###############################################
@@ -282,7 +292,7 @@ def main(args):
                                          early_stop_callback=early_stopping_callback,
                                          checkpoint_callback=checkpoint_callback,
                                          max_epochs=EPOCHS,
-                                         precision=32,
+                                         precision=args.precision,
                                          gpus=1 )
 
     ################################################ Fit Model #############################################################
@@ -294,6 +304,9 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--lr', default=(0.02 / 8), type=float, help='learning_rate')
 parser.add_argument('--wd', '--weight-decay', default=1e-4, type=float, help='weight_decay')
 parser.add_argument('--epochs', '--epochs', default=26, type=int, help='num_epochs')
+parser.add_argument('--model', '--model', default='resnet18', type=str, help='name_of_resnet_model')
+parser.add_argument('--precision', '--precision', default=18, type=int, help='precision')
+parser.add_argument('--mom', '--momentum', default=0.9, type=float, help='momentum')
 args = parser.parse_args()
 
 main(args)
