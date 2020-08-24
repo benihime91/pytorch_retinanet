@@ -37,7 +37,6 @@ class RetinaNetLosses(nn.Module):
         matches   = matcher(anchors, bbox_tgt)
         # create filtering mask to filter `background` and `ignore` classes from the bboxes
         bbox_mask = matches >= 0
-
         if bbox_mask.sum() != 0:
             bbox_pred = bbox_pred[bbox_mask]
             bbox_tgt  = bbox_tgt[matches[bbox_mask]]
@@ -45,9 +44,7 @@ class RetinaNetLosses(nn.Module):
             bb_loss   = F.smooth_l1_loss(bbox_pred, bbox_tgt)
         else:
             bb_loss = 0.0
-
         matches.add_(1)
-
         # filtering mask to filter `ignore` classes from the class predicitons
         clas_tgt = clas_tgt + 1
         clas_mask = matches >= 0
