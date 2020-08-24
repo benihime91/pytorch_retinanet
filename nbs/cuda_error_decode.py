@@ -83,23 +83,52 @@ df_test.reset_index(drop=True, inplace=True)
 ########################################################################################################################
 
 #################################### Image Transformations   ###########################################################
+transformations = [
+    A.HorizontalFlip(p=0.5),
+    A.CLAHE(),
+    A.IAASharpen(),
+    A.IAAPerspective(),
+    A.OneOf([
+        A.ShiftScaleRotate(),
+        A.Rotate(limit=60),
+    ], p=1.0),
+    A.OneOf([
+        A.RandomShadow(),
+        A.RandomBrightnessContrast(),
+        A.Cutout()
+    ], p=0.5)
+]
 
-transformations = [A.ToFloat(max_value=255.0, always_apply=True), ToTensorV2(always_apply=True)]
-transforms = A.Compose(transformations,
-                       p=1.0,
-                       bbox_params=A.BboxParams(format="pascal_voc",
-                                                label_fields=["class_labels"]))
+# Train Transformations
+train_transformations = transformations + [ A.ToFloat(max_value=255., always_apply=True), 
+                                            ToTensorV2(always_apply=True) ]
 
+# Valid Transformations
+valid_transformations = [ A.ToFloat(max_value=255., always_apply=True), 
+                          ToTensorV2(always_apply=True) ]
+
+# Transformations:
+transforms = {
+    "train":A.Compose(train_transformations, p=1.0, bbox_params=A.BboxParams(format="pascal_voc", 
+                                                                             label_fields=["class_labels"])),
+              
+    "valid": A.Compose(valid_transformations, p=1.0, bbox_params=A.BboxParams(format="pascal_voc", 
+                                                                              label_fields=["class_labels"]))
+    }
 ########################################################################################################################
 
 ############################################  Utily Classes and Functions    ###########################################
 def collate_fn(batch):
     return tuple(zip(*batch))
 class Dataset(torch.utils.data.Dataset):
-    def __init__(self, dataframe):
+    def __init__(self, dataframe, train):
         self.df = dataframe
         self.image_ids = self.df["filename"]
-        self.tfms = transforms
+        if train:
+            self.tfms  = transforms['train']
+        else:
+            self.tfms  = transforms['valid']
+
         
     def __len__(self):
         return len(self.image_ids)
@@ -218,25 +247,21 @@ class LitModel(pl.LightningModule):
 
 ###################################### Training Configurations ########################################################
 def main(args):
-    TRAIN_BATCH_SIZE = 3
+    TRAIN_BATCH_SIZE = 4
     VALID_BATCH_SIZE = 12
     EPOCHS = args.epochs
     MAX_LR = args.lr
     NUM_CLASSES = len(df['target'].unique()) + 1    # len(df['target']).unique() classes + 1 background class
 
-    print('[INFO] EPOCHS :', EPOCHS)
-    print('[INFO] LEARNING_RATE :', MAX_LR)
-    print('[INFO] NUM_CLASSES :', NUM_CLASSES)
-    print('\n')
     model = Retinanet(num_classes=NUM_CLASSES,
                       backbone_kind="resnet50",
                       pretrained=True,
                       freeze_bn=True)
 
-    train_ds = Dataset(df_train)
+    train_ds = Dataset(df_train, train=True)
     train_dl = DataLoader(train_ds, batch_size=TRAIN_BATCH_SIZE, shuffle=True, collate_fn=collate_fn, pin_memory=True,)
 
-    val_ds = Dataset(df_test)
+    val_ds = Dataset(df_test, train=False)
     val_dl = DataLoader(val_ds, batch_size=VALID_BATCH_SIZE, shuffle=False, collate_fn=collate_fn, pin_memory=True,)
 
     optimizer = optim.SGD([p for p in model.parameters() if p.requires_grad],
@@ -253,12 +278,11 @@ def main(args):
     lightning_model         = LitModel(model, optimizer, train_dl, val_dl, max_lr=MAX_LR)
     
     trainer                 = pl.Trainer(logger=[tb_logger],
-                                         gradient_clip_val=0.1,
                                          num_sanity_val_steps=0,
                                          early_stop_callback=early_stopping_callback,
                                          checkpoint_callback=checkpoint_callback,
                                          max_epochs=EPOCHS,
-                                         precision=16,
+                                         precision=32,
                                          gpus=1 )
 
     ################################################ Fit Model #############################################################
