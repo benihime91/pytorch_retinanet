@@ -164,7 +164,7 @@ class LitModel(pl.LightningModule):
         else:
             return [optimizer]
 
-    def optimizer_step(self, *args, **kwargs):
+    def optimizer_step(self, current_epoch, batch_nb, optimizer, optimizer_i, *args, **kwargs):
         # warm up lr
         if self.trainer.global_step < 500:
             lr_scale = min(1., float(self.trainer.global_step + 1) / 500.)
@@ -253,11 +253,13 @@ def main(args):
     lightning_model         = LitModel(model, optimizer, train_dl, val_dl, max_lr=MAX_LR)
     
     trainer                 = pl.Trainer(logger=[tb_logger],
+                                         gradient_clip_val=0.1,
+                                         num_sanity_val_steps=0,
                                          early_stop_callback=early_stopping_callback,
                                          checkpoint_callback=checkpoint_callback,
                                          max_epochs=EPOCHS,
                                          precision=16,
-                                         gpus=1)
+                                         gpus=1 )
 
     ################################################ Fit Model #############################################################
     trainer.fit(lightning_model)
