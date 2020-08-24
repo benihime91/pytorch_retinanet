@@ -84,48 +84,23 @@ df_test.reset_index(drop=True, inplace=True)
 ########################################################################################################################
 
 #################################### Image Transformations   ###########################################################
-transformations = [
-    A.HorizontalFlip(p=0.5),
-    A.OneOf([A.ShiftScaleRotate(), A.Rotate(limit=60),], p=1.0),
-]
-# Train Transformations
-train_transformations = transformations + [
-    A.ToFloat(max_value=255.0, always_apply=True),
-    ToTensorV2(always_apply=True),
-]
-# Valid Transformations
-valid_transformations = [
-    A.ToFloat(max_value=255.0, always_apply=True),
-    ToTensorV2(always_apply=True),
-]
 
-# Transformations:
-transforms = {
-    "train": A.Compose(
-        train_transformations,
-        p=1.0,
-        bbox_params=A.BboxParams(format="pascal_voc", label_fields=["class_labels"]),
-    ),
-    "valid": A.Compose(
-        valid_transformations,
-        p=1.0,
-        bbox_params=A.BboxParams(format="pascal_voc", label_fields=["class_labels"]),
-    ),
-}
+transformations = [A.ToFloat(max_value=255.0, always_apply=True), ToTensorV2(always_apply=True)]
+transforms = A.Compose(transformations,
+                       p=1.0,
+                       bbox_params=A.BboxParams(format="pascal_voc",
+                                                label_fields=["class_labels"]))
+
 ########################################################################################################################
 
 ############################################  Utily Classes and Functions    ###########################################
 def collate_fn(batch):
     return tuple(zip(*batch))
 class Dataset(torch.utils.data.Dataset):
-    def __init__(self, dataframe, train=False):
+    def __init__(self, dataframe):
         self.df = dataframe
         self.image_ids = self.df["filename"]
-
-        if train:
-            self.tfms = transforms["train"]
-        else:
-            self.tfms = transforms["valid"]
+        self.tmfs = transforms
 
     def __len__(self):
         return len(self.image_ids)
@@ -178,7 +153,7 @@ class LitModel(pl.LightningModule):
 
         self.scheduler = {
             'scheduler':torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[16, 22], gamma=0.1),
-            'interval':'epoch',
+            'interval' :'epoch',
             'frequency': 1
             }
 
@@ -243,24 +218,25 @@ class LitModel(pl.LightningModule):
 ########################################################################################################################
 
 ###################################### Training Configurations ########################################################
-TRAIN_BATCH_SIZE = 2
+TRAIN_BATCH_SIZE = 3
 VALID_BATCH_SIZE = 12
 EPOCHS = 26
-MAX_LR = 1e-04
+MAX_LR = 1e-05
 NUM_CLASSES = len(df['target'].unique()) + 1    # len(df['target']).unique() classes + 1 background class
+
 print('[INFO] EPOCHS :', EPOCHS)
 print('[INFO] LEARNING_RATE :', MAX_LR)
 print('[INFO] NUM_CLASSES :', NUM_CLASSES)
-
+print('\n')
 model = Retinanet(num_classes=NUM_CLASSES,
                   backbone_kind="resnet50",
                   pretrained=True,
                   freeze_bn=True)
 
-train_ds = Dataset(df_train, train=True)
+train_ds = Dataset(df_train)
 train_dl = DataLoader(train_ds, batch_size=TRAIN_BATCH_SIZE, shuffle=True, collate_fn=collate_fn, pin_memory=True,)
 
-val_ds = Dataset(df_test, train=False)
+val_ds = Dataset(df_test)
 val_dl = DataLoader(val_ds, batch_size=VALID_BATCH_SIZE, shuffle=False, collate_fn=collate_fn, pin_memory=True,)
 
 optimizer = optim.SGD([p for p in model.parameters() if p.requires_grad], lr=MAX_LR, momentum=0.9, weight_decay=1e-04)
@@ -270,7 +246,10 @@ tb_logger               = pl.loggers.TensorBoardLogger(save_dir="/content/logs")
 checkpoint_callback     = pl.callbacks.ModelCheckpoint("content/saved_models", mode="max", monitor="bbox_IOU", save_top_k=-1)
 early_stopping_callback = pl.callbacks.EarlyStopping(mode="max", monitor="bbox_IOU", patience=5)
 lightning_model         = LitModel(model, optimizer, train_dl, val_dl, max_lr=MAX_LR)
-trainer                 = pl.Trainer(logger=[tb_logger], 
+trainer                 = pl.Trainer(logger=[tb_logger],
+                                     accumulate_grad_batches=1,
+                                     gradient_clip_val=0.1,
+                                     progress_bar_refresh_rate=50,
                                      checkpoint_callback=checkpoint_callback,
                                      max_epochs=EPOCHS,
                                      precision=16,

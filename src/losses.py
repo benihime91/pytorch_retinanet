@@ -13,7 +13,6 @@ class RetinaNetLosses(nn.Module):
     def __init__(self, num_classes) -> None:
         super(RetinaNetLosses, self).__init__()
         self.n_c = num_classes
-        self.l1_loss = SigmaL1SmoothLoss()
 
     def focal_loss(self, inputs: Tensor, targets: Tensor) -> Tensor:
         """
@@ -39,7 +38,7 @@ class RetinaNetLosses(nn.Module):
             bbox_pred = bbox_pred[bbox_mask]
             bbox_tgt  = bbox_tgt[matches[bbox_mask]]
             bbox_tgt  = bbox_2_activ(bbox_tgt, anchors[bbox_mask])
-            bb_loss   = self.l1_loss(bbox_pred, bbox_tgt)
+            bb_loss   = F.smooth_l1_loss(bbox_pred, bbox_tgt)
         else:
             bb_loss = 0.0
 
@@ -94,11 +93,3 @@ def encode_class(idxs, n_classes):
     i1s = torch.LongTensor(list(range(len(idxs))))
     target[i1s[mask], idxs[mask] - 1] = 1
     return target
-
-
-class SigmaL1SmoothLoss(nn.Module):
-
-    def forward(self, output, target):
-        reg_diff = torch.abs(target - output)
-        reg_loss = torch.where(torch.le(reg_diff, 1/9), 4.5 * torch.pow(reg_diff, 2), reg_diff - 1/18)
-        return reg_loss.mean()
