@@ -36,6 +36,7 @@ annot_dir = Path("/content/oxford-iiit-pet/annotations/xmls")
 annots = list(annot_dir.iterdir())
 annots = [str(a) for a in annots]
 
+
 def xml_to_csv(pths):
     """Extracts the filenames and the bboxes from the xml_list"""
     xml_list = []
@@ -64,6 +65,8 @@ def xml_to_csv(pths):
     col_n = ["filename", "xmin", "ymin", "xmax", "ymax"]
     df = pd.DataFrame(xml_list, columns=col_n)
     return df
+
+
 ########################################################################################################################
 
 ################################################  Data Preprocessing    ################################################
@@ -77,7 +80,9 @@ le = preprocessing.LabelEncoder()
 df["target"] = le.fit_transform(df["class"].values) + 1
 
 df = df.sample(frac=1).reset_index(drop=True)
-df_train, df_test = model_selection.train_test_split(df, stratify=df["target"], test_size=0.25, shuffle=True)
+df_train, df_test = model_selection.train_test_split(
+    df, stratify=df["target"], test_size=0.25, shuffle=True
+)
 df_train.reset_index(drop=True, inplace=True)
 df_test.reset_index(drop=True, inplace=True)
 ########################################################################################################################
@@ -88,48 +93,51 @@ transformations = [
     A.CLAHE(),
     A.IAASharpen(),
     A.IAAPerspective(),
-    A.OneOf([
-        A.ShiftScaleRotate(),
-        A.Rotate(limit=60),
-    ], p=1.0),
-    A.OneOf([
-        A.RandomShadow(),
-        A.RandomBrightnessContrast(),
-        A.Cutout()
-    ], p=0.5)
+    A.OneOf([A.ShiftScaleRotate(), A.Rotate(limit=60),], p=1.0),
+    A.OneOf([A.RandomShadow(), A.RandomBrightnessContrast(), A.Cutout()], p=0.5),
 ]
 
 # Train Transformations
-train_transformations = transformations + [ A.ToFloat(max_value=255., always_apply=True), 
-                                            ToTensorV2(always_apply=True) ]
+train_transformations = transformations + [
+    A.ToFloat(max_value=255.0, always_apply=True),
+    ToTensorV2(always_apply=True),
+]
 
 # Valid Transformations
-valid_transformations = [ A.ToFloat(max_value=255., always_apply=True), 
-                          ToTensorV2(always_apply=True) ]
+valid_transformations = [
+    A.ToFloat(max_value=255.0, always_apply=True),
+    ToTensorV2(always_apply=True),
+]
 
 # Transformations:
 transforms = {
-    "train":A.Compose(train_transformations, p=1.0, bbox_params=A.BboxParams(format="pascal_voc", 
-                                                                             label_fields=["class_labels"])),
-              
-    "valid": A.Compose(valid_transformations, p=1.0, bbox_params=A.BboxParams(format="pascal_voc", 
-                                                                              label_fields=["class_labels"]))
-    }
+    "train": A.Compose(
+        train_transformations,
+        p=1.0,
+        bbox_params=A.BboxParams(format="pascal_voc", label_fields=["class_labels"]),
+    ),
+    "valid": A.Compose(
+        valid_transformations,
+        p=1.0,
+        bbox_params=A.BboxParams(format="pascal_voc", label_fields=["class_labels"]),
+    ),
+}
 ########################################################################################################################
 
 ############################################  Utily Classes and Functions    ###########################################
 def collate_fn(batch):
     return tuple(zip(*batch))
+
+
 class Dataset(torch.utils.data.Dataset):
     def __init__(self, dataframe, train):
         self.df = dataframe
         self.image_ids = self.df["filename"]
         if train:
-            self.tfms  = transforms['train']
+            self.tfms = transforms["train"]
         else:
-            self.tfms  = transforms['valid']
+            self.tfms = transforms["valid"]
 
-        
     def __len__(self):
         return len(self.image_ids)
 
@@ -162,6 +170,7 @@ class Dataset(torch.utils.data.Dataset):
         target["iscrowd"] = iscrowd
         return image, target, image_idx
 
+
 class LitModel(pl.LightningModule):
     def __init__(
         self,
@@ -180,10 +189,12 @@ class LitModel(pl.LightningModule):
         self.max_lr = max_lr
 
         self.scheduler = {
-            'scheduler':torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[16, 22], gamma=0.1),
-            'interval' :'epoch',
-            'frequency': 1
-            }
+            "scheduler": torch.optim.lr_scheduler.MultiStepLR(
+                self.optimizer, milestones=[16, 22], gamma=0.1
+            ),
+            "interval": "epoch",
+            "frequency": 1,
+        }
 
     def configure_optimizers(self, *args, **kwargs):
         optimizer = self.optimizer
@@ -193,13 +204,15 @@ class LitModel(pl.LightningModule):
         else:
             return [optimizer]
 
-    def optimizer_step(self, current_epoch, batch_nb, optimizer, optimizer_i, *args, **kwargs):
+    def optimizer_step(
+        self, current_epoch, batch_nb, optimizer, optimizer_i, *args, **kwargs
+    ):
         # warm up lr
         if self.trainer.global_step < 500:
-            lr_scale = min(1., float(self.trainer.global_step + 1) / 500.)
+            lr_scale = min(1.0, float(self.trainer.global_step + 1) / 500.0)
             for pg in optimizer.param_groups:
-                pg['lr'] = lr_scale * self.max_lr
-        
+                pg["lr"] = lr_scale * self.max_lr
+
         # update params
         optimizer.step()
         optimizer.zero_grad()
@@ -224,14 +237,17 @@ class LitModel(pl.LightningModule):
         # Separate Losses
         loss_dict = self.model(images, targets)
         # Total Loss
-        losses = loss_dict['classification_loss'] + loss_dict['regression_loss']
+        losses = loss_dict["classification_loss"] + loss_dict["regression_loss"]
         return {"loss": losses, "log": loss_dict, "progress_bar": loss_dict}
 
     def validation_step(self, batch, batch_idx, *args, **kwargs):
         images, targets, _ = batch
         targets = [{k: v for k, v in t.items()} for t in targets]
         outputs = self.model(images, targets)
-        res = {target["image_id"].item(): output for target, output in zip(targets, outputs)}
+        res = {
+            target["image_id"].item(): output
+            for target, output in zip(targets, outputs)
+        }
         self.coco_evaluator.update(res)
         return {}
 
@@ -242,7 +258,13 @@ class LitModel(pl.LightningModule):
         metric = self.coco_evaluator.coco_eval["bbox"].stats[0]
         metric = torch.as_tensor(metric)
         tensorboard_logs = {"bbox_IOU": metric}
-        return {"val_loss": metric, "log": tensorboard_logs, "progress_bar": tensorboard_logs,}
+        return {
+            "val_loss": metric,
+            "log": tensorboard_logs,
+            "progress_bar": tensorboard_logs,
+        }
+
+
 ########################################################################################################################
 
 ###################################### Training Configurations ########################################################
@@ -251,62 +273,91 @@ def main(args):
     VALID_BATCH_SIZE = 12
     EPOCHS = args.epochs
     MAX_LR = args.lr
-    NUM_CLASSES = len(df['target'].unique()) + 1    # len(df['target']).unique() classes + 1 background class
-    print('------------------------')
-    print('[INFO] ARGUMENTS: >>')
-    print('[INFO] BACKBONE:', args.model)
-    print('[INFO] EPOCHS:', args.epochs)
-    print('[INFO] LEARNING_RATE:', args.lr)
-    print('[INFO] WEIGHT_DECAY:', args.wd)
-    print('[INFO] MOMENTUM:', args.mom)
-    print('[INFO] PRECISION:', args.precision)
-    print('------------------------')
+    NUM_CLASSES = (
+        len(df["target"].unique()) + 1
+    )  # len(df['target']).unique() classes + 1 background class
+    print("------------------------")
+    print("[INFO] ARGUMENTS: >>")
+    print("[INFO] BACKBONE:", args.model)
+    print("[INFO] EPOCHS:", args.epochs)
+    print("[INFO] LEARNING_RATE:", args.lr)
+    print("[INFO] WEIGHT_DECAY:", args.wd)
+    print("[INFO] MOMENTUM:", args.mom)
+    print("[INFO] PRECISION:", args.precision)
+    print("------------------------")
 
-    model = Retinanet(num_classes=NUM_CLASSES,
-                      backbone_kind=args.model,
-                      pretrained=True,
-                      freeze_bn=True)
+    model = Retinanet(
+        num_classes=NUM_CLASSES,
+        backbone_kind=args.model,
+        pretrained=True,
+        freeze_bn=True,
+    )
 
     train_ds = Dataset(df_train, train=True)
-    train_dl = DataLoader(train_ds, batch_size=TRAIN_BATCH_SIZE, shuffle=True, collate_fn=collate_fn, pin_memory=True,)
+    train_dl = DataLoader(
+        train_ds,
+        batch_size=TRAIN_BATCH_SIZE,
+        shuffle=True,
+        collate_fn=collate_fn,
+        pin_memory=True,
+    )
 
     val_ds = Dataset(df_test, train=False)
-    val_dl = DataLoader(val_ds, batch_size=VALID_BATCH_SIZE, shuffle=False, collate_fn=collate_fn, pin_memory=True,)
+    val_dl = DataLoader(
+        val_ds,
+        batch_size=VALID_BATCH_SIZE,
+        shuffle=False,
+        collate_fn=collate_fn,
+        pin_memory=True,
+    )
 
-    optimizer = optim.SGD([p for p in model.parameters() if p.requires_grad],
-                          lr=MAX_LR, 
-                          momentum=args.momentum,
-                          weight_decay=args.wd)
+    optimizer = optim.SGD(
+        [p for p in model.parameters() if p.requires_grad],
+        lr=MAX_LR,
+        momentum=args.mom,
+        weight_decay=args.wd,
+    )
 
     ###################################### Lightning Modules ###############################################
-    tb_logger               = pl.loggers.TensorBoardLogger(save_dir="/content/logs")
-    checkpoint_callback     = pl.callbacks.ModelCheckpoint("content/saved_models", 
-                                                            mode="max",
-                                                            monitor="bbox_IOU",
-                                                            save_top_k=-1)                                                       
-    early_stopping_callback = pl.callbacks.EarlyStopping(mode="max", monitor="bbox_IOU", patience=5)
-    lightning_model         = LitModel(model, optimizer, train_dl, val_dl, max_lr=MAX_LR)
-    
-    trainer                 = pl.Trainer(logger=[tb_logger],
-                                         num_sanity_val_steps=0,
-                                         early_stop_callback=early_stopping_callback,
-                                         checkpoint_callback=checkpoint_callback,
-                                         max_epochs=EPOCHS,
-                                         precision=args.precision,
-                                         gpus=1 )
+    tb_logger = pl.loggers.TensorBoardLogger(save_dir="/content/logs")
+    checkpoint_callback = pl.callbacks.ModelCheckpoint(
+        "content/saved_models", mode="max", monitor="bbox_IOU", save_top_k=-1
+    )
+    early_stopping_callback = pl.callbacks.EarlyStopping(
+        mode="max", monitor="bbox_IOU", patience=5
+    )
+    lightning_model = LitModel(model, optimizer, train_dl, val_dl, max_lr=MAX_LR)
+
+    trainer = pl.Trainer(
+        logger=[tb_logger],
+        num_sanity_val_steps=0,
+        early_stop_callback=early_stopping_callback,
+        checkpoint_callback=checkpoint_callback,
+        max_epochs=EPOCHS,
+        precision=args.precision,
+        gpus=1,
+    )
 
     ################################################ Fit Model #############################################################
     trainer.fit(lightning_model)
     ########################################################################################################################
 
+
 import argparse
+
 parser = argparse.ArgumentParser()
-parser.add_argument('--lr', default=(0.02 / 8), type=float, help='learning_rate')
-parser.add_argument('--wd', '--weight-decay', default=1e-4, type=float, help='weight_decay')
-parser.add_argument('--epochs', '--epochs', default=26, type=int, help='num_epochs')
-parser.add_argument('--model', '--model', default='resnet18', type=str, help='name_of_resnet_model')
-parser.add_argument('--precision', '--precision', default=18, type=int, help='precision')
-parser.add_argument('--mom', '--momentum', default=0.9, type=float, help='momentum')
+parser.add_argument("--lr", default=(0.02 / 8), type=float, help="learning_rate")
+parser.add_argument(
+    "--wd", "--weight-decay", default=1e-4, type=float, help="weight_decay"
+)
+parser.add_argument("--epochs", "--epochs", default=26, type=int, help="num_epochs")
+parser.add_argument(
+    "--model", "--model", default="resnet18", type=str, help="name_of_resnet_model"
+)
+parser.add_argument(
+    "--precision", "--precision", default=18, type=int, help="precision"
+)
+parser.add_argument("--mom", "--momentum", default=0.9, type=float, help="momentum")
 args = parser.parse_args()
 
 main(args)
