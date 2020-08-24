@@ -61,12 +61,12 @@ def bbox_2_activ(bboxes: Tensor, anchors: Tensor) -> Tensor:
 
     # Convert from tlbr to cthw
     a_width    = anchor_x2 - anchor_x1
-    a_height   = anchor_y1 - anchor_y1
+    a_height   = anchor_y1 - anchor_y2
     a_center_x = anchor_x1 + 0.5 * a_width
     a_center_y = anchor_y1 + 0.5 * a_height
 
     b_width    = bbox_x2 - bbox_x1
-    b_height   = bbox_y1 - bbox_y1
+    b_height   = bbox_y1 - bbox_y2
     b_center_x = bbox_x1 + 0.5 * b_width
     b_center_y = bbox_y1 + 0.5 * b_height
     
