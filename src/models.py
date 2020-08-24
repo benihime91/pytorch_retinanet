@@ -206,7 +206,7 @@ class Retinanet(nn.Module):
             labels = labels[:, 1:]
 
             # Batch all the parameters
-            bb_per_im = bb_per_im.reshape(1, 4)
+            bb_per_im = bb_per_im.reshape(-1, 4)
             sc_per_im = sc_per_im.reshape(-1)
             labels = labels.reshape(-1)
 
