@@ -355,7 +355,7 @@ parser.add_argument(
     "--model", "--model", default="resnet18", type=str, help="name_of_resnet_model"
 )
 parser.add_argument(
-    "--precision", "--precision", default=18, type=int, help="precision"
+    "--precision", "--precision", default=16, type=int, help="precision"
 )
 parser.add_argument("--mom", "--momentum", default=0.9, type=float, help="momentum")
 args = parser.parse_args()
