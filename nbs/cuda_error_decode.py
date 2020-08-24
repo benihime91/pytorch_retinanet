@@ -32,14 +32,10 @@ from pathlib import Path
 
 pl.seed_everything(123)
 
-# --------------------------------------------------------------------------------------------------
-# IMAGE PATHS
-# --------------------------------------------------------------------------------------------------
 img_desc = Path("/content/oxford-iiit-pet/images")
 annot_dir = Path("/content/oxford-iiit-pet/annotations/xmls")
 annots = list(annot_dir.iterdir())
 annots = [str(a) for a in annots]
-
 
 def xml_to_csv(pths):
     """Extracts the filenames and the bboxes from the xml_list"""
@@ -69,32 +65,25 @@ def xml_to_csv(pths):
     col_n = ["filename", "xmin", "ymin", "xmax", "ymax"]
     df = pd.DataFrame(xml_list, columns=col_n)
     return df
+########################################################################################################################
 
-
-# --------------------------------------------------------------------------------------------------
-# Fix Data
-# --------------------------------------------------------------------------------------------------
+################################################  Data Preprocessing    ################################################
 df = xml_to_csv(annots)
 pat = r"/([^/]+)_\d+.jpg$"
 pat = re.compile(pat)
-# 1. Extract the label
+
 df["class"] = [pat.search(fname).group(1).lower() for fname in df.filename]
-# 2. Convert the classes to integers add +1 becaus0 is background class for `FasterRCNN`
+
 le = preprocessing.LabelEncoder()
 df["target"] = le.fit_transform(df["class"].values) + 1
-# 3. Shuffle the dataFrame
+
 df = df.sample(frac=1).reset_index(drop=True)
-# Take a small subset to train
-df, _ = model_selection.train_test_split(df, stratify=df.target, test_size=0.5, shuffle=True)
-df.reset_index(drop=True, inplace=True)
 df_train, df_test = model_selection.train_test_split(df, stratify=df["target"], test_size=0.25, shuffle=True)
 df_train.reset_index(drop=True, inplace=True)
 df_test.reset_index(drop=True, inplace=True)
+########################################################################################################################
 
-
-# --------------------------------------------------------------------------------------------------
-# IMAGE TRANSFORMATIONS
-# --------------------------------------------------------------------------------------------------
+#################################### Image Transformations   ###########################################################
 transformations = [
     A.HorizontalFlip(p=0.5),
     A.OneOf([A.ShiftScaleRotate(), A.Rotate(limit=60),], p=1.0),
@@ -123,12 +112,11 @@ transforms = {
         bbox_params=A.BboxParams(format="pascal_voc", label_fields=["class_labels"]),
     ),
 }
+########################################################################################################################
 
-# --------------------------------------------------------------------------------------------------
-# LIGHTNING MODULE
-# --------------------------------------------------------------------------------------------------
-
-
+############################################  Utily Classes and Functions    ###########################################
+def collate_fn(batch):
+    return tuple(zip(*batch))
 class Dataset(torch.utils.data.Dataset):
     def __init__(self, dataframe, train=False):
         self.df = dataframe
@@ -171,11 +159,6 @@ class Dataset(torch.utils.data.Dataset):
         target["iscrowd"] = iscrowd
         return image, target, image_idx
 
-
-def collate_fn(batch):
-    return tuple(zip(*batch))
-
-
 class LitModel(pl.LightningModule):
     def __init__(
         self,
@@ -184,7 +167,6 @@ class LitModel(pl.LightningModule):
         train_dl: torch.utils.data.DataLoader,
         val_dl: torch.utils.data.DataLoader,
         max_lr: float,
-        scheduler: optim.lr_scheduler = None,
     ):
 
         super(LitModel, self).__init__()
@@ -192,8 +174,13 @@ class LitModel(pl.LightningModule):
         self.optimizer = optimizer
         self.train_dl = train_dl
         self.val_dl = val_dl
-        self.scheduler = scheduler
         self.max_lr = max_lr
+
+        self.scheduler = {
+            'scheduler':torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[16, 22], gamma=0.1),
+            'interval':'epoch',
+            'frequency': 1
+            }
 
     def configure_optimizers(self, *args, **kwargs):
         optimizer = self.optimizer
@@ -203,12 +190,13 @@ class LitModel(pl.LightningModule):
         else:
             return [optimizer]
 
-    def optimizer_step(self, *args, **kwargs):
-        # warmup lr
+    def optimizer_step(self, optimizer, *args, **kwargs):
+        # warm up lr
         if self.trainer.global_step < 500:
-            alpha = min(1.0, float(self.trainer.global_step + 1) / 500.0)
-            for pg in self.optimizer.param_groups:
-                pg["lr"] = alpha * self.max_lr
+            lr_scale = min(1., float(self.trainer.global_step + 1) / 500.)
+            for pg in optimizer.param_groups:
+                pg['lr'] = lr_scale * self.max_lr
+        
         # update params
         optimizer.step()
         optimizer.zero_grad()
@@ -252,53 +240,36 @@ class LitModel(pl.LightningModule):
         metric = torch.as_tensor(metric)
         tensorboard_logs = {"bbox_IOU": metric}
         return {"val_loss": metric, "log": tensorboard_logs, "progress_bar": tensorboard_logs,}
+########################################################################################################################
 
-###################################### Training Configurations #####################################
-
-# --------------------------------------------------------------------------------------------------
-# Model
-# --------------------------------------------------------------------------------------------------
-# unique classes + 1: for background
-model = Retinanet( num_classes=38, backbone_kind="resnet50", pretrained=True)
-
-# --------------------------------------------------------------------------------------------------
-# Inputs
-# --------------------------------------------------------------------------------------------------
+###################################### Training Configurations ########################################################
 TRAIN_BATCH_SIZE = 2
 VALID_BATCH_SIZE = 12
+EPOCHS = 26
+MAX_LR = 1e-04
+NUM_CLASSES = len(df['target']).unique() + 1    # len(df['target']).unique() classes + 1 background class
 
-# Train DataLoader
+model = Retinanet(num_classes=38, backbone_kind="resnet50", pretrained=True, freeze_bn=True)
+
 train_ds = Dataset(df_train, train=True)
 train_dl = DataLoader(train_ds, batch_size=TRAIN_BATCH_SIZE, shuffle=True, collate_fn=collate_fn, pin_memory=True,)
 
-# Valid DataLoader
 val_ds = Dataset(df_test, train=False)
 val_dl = DataLoader(val_ds, batch_size=VALID_BATCH_SIZE, shuffle=False, collate_fn=collate_fn, pin_memory=True,)
 
-# --------------------------------------------------------------------------------------------------
-# Training Options
-# --------------------------------------------------------------------------------------------------
-EPOCHS = 20
-MAX_LR = 3e-05
+optimizer = optim.SGD([p for p in model.parameters() if p.requires_grad], lr=MAX_LR, momentum=0.9, weight_decay=1e-04)
 
-# Optimzier and LrScheduler
-optimizer = optim.Adam([p for p in model.parameters() if p.requires_grad], lr=MAX_LR, betas=(0.9,0.99))
-# --------------------------------------------------------------------------------------------------
-# PyTorch-Lightning CallBacks
-# --------------------------------------------------------------------------------------------------
-tb_logger = pl.loggers.TensorBoardLogger(save_dir="/content/logs")
-# TensorBoard Logger
-
-# CheckPoint Logger
-checkpoint_callback = pl.callbacks.ModelCheckpoint("content/saved_models", mode="max", monitor="bbox_IOU", save_top_k=-1)
-# EarlyStopping Callback
+###################################### Lightning Modules ###############################################
+tb_logger               = pl.loggers.TensorBoardLogger(save_dir="/content/logs")
+checkpoint_callback     = pl.callbacks.ModelCheckpoint("content/saved_models", mode="max", monitor="bbox_IOU", save_top_k=-1)
 early_stopping_callback = pl.callbacks.EarlyStopping(mode="max", monitor="bbox_IOU", patience=5)
+lightning_model         = LitModel(model, optimizer, train_dl, val_dl, max_lr=MAX_LR)
+trainer                 = pl.Trainer(logger=[tb_logger], 
+                                     checkpoint_callback=checkpoint_callback,
+                                     max_epochs=EPOCHS,
+                                     precision=16,
+                                     gpus=1)
 
-lightning_model = LitModel(model, optimizer, train_dl, val_dl, max_lr=MAX_LR)
-
-trainer = pl.Trainer(logger=[tb_logger], gradient_clip_val=0.1, 
-                     checkpoint_callback=checkpoint_callback,
-                     max_epochs=EPOCHS, precision=16, gpus=1)
-
+################################################ Fit Model #############################################################
 trainer.fit(lightning_model)
-
+########################################################################################################################
