@@ -69,35 +69,37 @@ class Retinanet(nn.Module):
 
     def __init__(
         self,
-        num_classes: Optional[int]   = None,
+        num_classes: Optional[int] = None,
         backbone_kind: Optional[str] = None,
-        prior: Optional[float]       = None,
-        pretrained: Optional[bool]   = None,
-        nms_thres: Optional[float]   = None,
+        prior: Optional[float] = None,
+        pretrained: Optional[bool] = None,
+        nms_thres: Optional[float] = None,
         score_thres: Optional[float] = None,
         max_detections_per_images: Optional[int] = None,
-        freeze_bn: Optional[bool]    = None,
-        min_size: Optional[int]      = None,
-        max_size: Optional[int]      = None,
-        image_mean: List[float]      = None,
-        image_std: List[float]       = None,
+        freeze_bn: Optional[bool] = None,
+        min_size: Optional[int] = None,
+        max_size: Optional[int] = None,
+        image_mean: List[float] = None,
+        image_std: List[float] = None,
         anchor_generator: Optional[AnchorGenerator] = None,
     ) -> None:
 
         super(Retinanet, self).__init__()
 
-        num_classes      = ifnone(num_classes, NUM_CLASSES)
-        backbone_kind    = ifnone(backbone_kind, BACKBONE)
-        prior            = ifnone(prior, PRIOR)
-        pretrained       = ifnone(pretrained, PRETRAINED_BACKBONE)
-        nms_thres        = ifnone(nms_thres, NMS_THRES)
-        score_thres      = ifnone(score_thres, SCORE_THRES)
-        max_detections_per_images = ifnone(max_detections_per_images, MAX_DETECTIONS_PER_IMAGE)
-        freeze_bn        = ifnone(freeze_bn, FREEZE_BN)
-        min_size         = ifnone(min_size, MIN_IMAGE_SIZE)
-        max_size         = ifnone(max_size, MAX_IMAGE_SIZE)
-        image_mean       = ifnone(image_mean, MEAN)
-        image_std        = ifnone(image_std, STD)
+        num_classes = ifnone(num_classes, NUM_CLASSES)
+        backbone_kind = ifnone(backbone_kind, BACKBONE)
+        prior = ifnone(prior, PRIOR)
+        pretrained = ifnone(pretrained, PRETRAINED_BACKBONE)
+        nms_thres = ifnone(nms_thres, NMS_THRES)
+        score_thres = ifnone(score_thres, SCORE_THRES)
+        max_detections_per_images = ifnone(
+            max_detections_per_images, MAX_DETECTIONS_PER_IMAGE
+        )
+        freeze_bn = ifnone(freeze_bn, FREEZE_BN)
+        min_size = ifnone(min_size, MIN_IMAGE_SIZE)
+        max_size = ifnone(max_size, MAX_IMAGE_SIZE)
+        image_mean = ifnone(image_mean, MEAN)
+        image_std = ifnone(image_std, STD)
         anchor_generator = ifnone(anchor_generator, AnchorGenerator())
 
         # The reason for the 0.05 is because that is what appears to be used by other systems as well,
@@ -110,27 +112,35 @@ class Retinanet(nn.Module):
         # Assemble `RetinaNet`
         # ------------------------------------------------------
         # # Instantiate `GeneralizedRCNNTransform` to resize inputs
-        self.transform_inputs = GeneralizedRCNNTransform(min_size, max_size, image_mean, image_std)
+        self.transform_inputs = GeneralizedRCNNTransform(
+            min_size, max_size, image_mean, image_std
+        )
         # Get the back bone of the Model
-        self.backbone_kind    = backbone_kind
-        self.backbone         = get_backbone(self.backbone_kind, pretrained, freeze_bn=freeze_bn)
+        self.backbone_kind = backbone_kind
+        self.backbone = get_backbone(
+            self.backbone_kind, pretrained, freeze_bn=freeze_bn
+        )
         # # Grab the backbone output channels
-        self.fpn_szs          = self._get_backbone_ouputs()
+        self.fpn_szs = self._get_backbone_ouputs()
         # # Instantiate the `FPN`
-        self.fpn              = FPN(self.fpn_szs[0], self.fpn_szs[1], self.fpn_szs[2], out_channels=256)
+        self.fpn = FPN(
+            self.fpn_szs[0], self.fpn_szs[1], self.fpn_szs[2], out_channels=256
+        )
         # # Instantiate anchor Generator
         self.anchor_generator = anchor_generator
-        self.num_anchors      = self.anchor_generator.num_cell_anchors[0]
+        self.num_anchors = self.anchor_generator.num_cell_anchors[0]
         # # Instantiate `RetinaNetHead`
-        self.retinanet_head   = RetinaNetHead(256, 256, self.num_anchors, num_classes, prior)
+        self.retinanet_head = RetinaNetHead(
+            256, 256, self.num_anchors, num_classes, prior
+        )
 
         # ------------------------------------------------------
         # Parameters
         # ------------------------------------------------------
-        self.score_thres        = score_thres
-        self.nms_thres          = nms_thres
+        self.score_thres = score_thres
+        self.nms_thres = nms_thres
         self.detections_per_img = max_detections_per_images
-        self.num_classes        = num_classes
+        self.num_classes = num_classes
 
     def _get_backbone_ouputs(self) -> List:
         if self.backbone_kind in __small__:
@@ -147,10 +157,20 @@ class Retinanet(nn.Module):
             ]
         return fpn_szs
 
-    def compute_loss(self,targets: List[Dict[str, Tensor]],outputs: Dict[str, Tensor],anchors: List[Tensor]):
+    def compute_loss(
+        self,
+        targets: List[Dict[str, Tensor]],
+        outputs: Dict[str, Tensor],
+        anchors: List[Tensor],
+    ):
         return self.retinanet_head.compute_loss(targets, outputs, anchors)
 
-    def process_detections(self,outputs: Dict[str, Tensor],anchors: List[Tensor],im_szs: List[Tuple[int, int]]):
+    def process_detections(
+        self,
+        outputs: Dict[str, Tensor],
+        anchors: List[Tensor],
+        im_szs: List[Tuple[int, int]],
+    ):
         class_logits = outputs.pop("cls_preds")
         bbox_preds = outputs.pop("bbox_preds")
         scores = torch.sigmoid(class_logits)
@@ -160,7 +180,9 @@ class Retinanet(nn.Module):
         labels = torch.arange(num_classes, device=device)
         labels = labels.view(1, -1).expand_as(scores)
         final_detections = []
-        for bb_per_im, sc_per_im, lbl_per_im, anc_per_im, im_sz in zip(bbox_preds, scores, labels, anchors, im_szs):
+        for bb_per_im, sc_per_im, lbl_per_im, anc_per_im, im_sz in zip(
+            bbox_preds, scores, labels, anchors, im_szs
+        ):
             # Convert the activations: outputs from the model to bboxes
             bb_per_im = activ_2_bbox(bb_per_im, anc_per_im)
             # clip boxes to image size
@@ -173,15 +195,27 @@ class Retinanet(nn.Module):
             for cls_idx in range(num_classes):
                 # remove low scoring boxes
                 lw_idx = torch.gt(sc_per_im[:, cls_idx], self.score_thres)
-                bb_per_cls, sc_per_cls, lbl_per_cls = (bb_per_im[lw_idx], sc_per_im[lw_idx, cls_idx], lbl_per_im[lw_idx, cls_idx])
+                bb_per_cls, sc_per_cls, lbl_per_cls = (
+                    bb_per_im[lw_idx],
+                    sc_per_im[lw_idx, cls_idx],
+                    lbl_per_im[lw_idx, cls_idx],
+                )
                 # remove empty boxes
                 mask = remove_small_boxes(bb_per_cls, min_size=1e-2)
-                bb_per_cls, sc_per_cls, lbl_per_cls = (bb_per_cls[mask], sc_per_cls[mask], lbl_per_cls[mask])
+                bb_per_cls, sc_per_cls, lbl_per_cls = (
+                    bb_per_cls[mask],
+                    sc_per_cls[mask],
+                    lbl_per_cls[mask],
+                )
                 # non-maximum suppression, independently done per class
                 mask = nms(bb_per_cls, sc_per_cls, self.nms_thres)
                 # mask only topk scoring predictions
                 mask = mask[: self.detections_per_img]
-                bb_per_cls, sc_per_cls, lbl_per_cls = (bb_per_cls[mask], sc_per_cls[mask], lbl_per_cls[mask])
+                bb_per_cls, sc_per_cls, lbl_per_cls = (
+                    bb_per_cls[mask],
+                    sc_per_cls[mask],
+                    lbl_per_cls[mask],
+                )
                 all_boxes.append(bb_per_cls)
                 all_scores.append(sc_per_cls)
                 all_labels.append(lbl_per_cls)
@@ -202,7 +236,9 @@ class Retinanet(nn.Module):
         else:
             return detections
 
-    def forward(self, images: List[Tensor], targets: Optional[List[Dict[str, Tensor]]] = None):
+    def forward(
+        self, images: List[Tensor], targets: Optional[List[Dict[str, Tensor]]] = None
+    ):
         if self.training and targets is None:
             raise ValueError("In training Model `targets` must be given")
         # Grab the original Image sizes
@@ -213,10 +249,10 @@ class Retinanet(nn.Module):
             orig_im_szs.append((val[0], val[1]))
 
         images, targets = self.transform_inputs(images, targets)
-        feature_maps    = self.backbone(images.tensors)
-        fpn_outputs     = self.fpn(feature_maps)
-        anchors         = self.anchor_generator(images, fpn_outputs)
-        outputs         = self.retinanet_head(fpn_outputs)
+        feature_maps = self.backbone(images.tensors)
+        fpn_outputs = self.fpn(feature_maps)
+        anchors = self.anchor_generator(images, fpn_outputs)
+        outputs = self.retinanet_head(fpn_outputs)
 
         losses = {}
         detections = torch.jit.annotate(List[Dict[str, Tensor]], [])
@@ -226,6 +262,10 @@ class Retinanet(nn.Module):
         else:
             # compute the detections
             with torch.no_grad():
-                detections = self.process_detections(outputs, anchors, images.image_sizes)
-                detections = self.transform_inputs.postprocess(detections, images.image_sizes, orig_im_szs)
+                detections = self.process_detections(
+                    outputs, anchors, images.image_sizes
+                )
+                detections = self.transform_inputs.postprocess(
+                    detections, images.image_sizes, orig_im_szs
+                )
         return self._get_outputs(losses, detections)

@@ -86,11 +86,20 @@ class RetinaNetHead(nn.Module):
         prior: float,
     ) -> None:
         super(RetinaNetHead, self).__init__()
-        self.classification_head = RetinaNetClassSubnet(in_channels, out_channels, num_anchors, num_classes, prior)
-        self.regression_head     = RetinaNetBoxSubnet(in_channels, out_channels, num_anchors)
-        self.losses              = RetinaNetLosses(num_classes)
+        self.classification_head = RetinaNetClassSubnet(
+            in_channels, out_channels, num_anchors, num_classes, prior
+        )
+        self.regression_head = RetinaNetBoxSubnet(
+            in_channels, out_channels, num_anchors
+        )
+        self.losses = RetinaNetLosses(num_classes)
 
-    def compute_loss(self, targets: List[Dict[str, Tensor]], outputs: Dict[str, Tensor], anchors: List[Tensor]):
+    def compute_loss(
+        self,
+        targets: List[Dict[str, Tensor]],
+        outputs: Dict[str, Tensor],
+        anchors: List[Tensor],
+    ):
         # Calculate Losses
         output_dict = self.losses(targets, outputs, anchors)
         return output_dict
@@ -148,10 +157,14 @@ class RetinaNetClassSubnet(nn.Module):
             nn.Conv2d(out_channels, out_channels, 3, padding=1),
             nn.ReLU(inplace=True),
         )
-        self.class_subnet_output = nn.Conv2d(out_channels, num_anchors*num_classes, 3, stride=1, padding=1)
+        self.class_subnet_output = nn.Conv2d(
+            out_channels, num_anchors * num_classes, 3, stride=1, padding=1
+        )
         # Initialize the Final Layer as given in :paper: `RetinaNet`
         torch.nn.init.normal_(self.class_subnet_output.weight, std=0.01)
-        torch.nn.init.constant_(self.class_subnet_output.bias, -math.log((1 - prior) / prior))
+        torch.nn.init.constant_(
+            self.class_subnet_output.bias, -math.log((1 - prior) / prior)
+        )
 
     def forward(self, feature_maps):
         cls_preds = []
@@ -207,7 +220,9 @@ class RetinaNetBoxSubnet(nn.Module):
             nn.Conv2d(out_channels, out_channels, 3, padding=1, stride=1),
             nn.ReLU(inplace=True),
         )
-        self.box_subnet_output = nn.Conv2d(out_channels, num_anchors*4, 3, padding=1, stride=1)
+        self.box_subnet_output = nn.Conv2d(
+            out_channels, num_anchors * 4, 3, padding=1, stride=1
+        )
         # Initialize the Final Layer as given in :paper: `RetinaNet`
         torch.nn.init.normal_(self.box_subnet_output.weight, std=0.01)
         torch.nn.init.zeros_(self.box_subnet_output.bias)
