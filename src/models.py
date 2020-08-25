@@ -207,16 +207,16 @@ class Retinanet(nn.Module):
             bb_per_im = clip_boxes_to_image(bb_per_im, im_sz)
             # Remove Small Boxes
             keep = remove_small_boxes(bb_per_im, min_size=1e-02)
-            bb_per_im, sc_per_cls, lbl_per_cls = (
+            bb_per_im, sc_per_im, lbl_per_im = (
                 bb_per_im[keep],
                 sc_per_im[keep],
                 lbl_per_im[keep],
             )
 
             # batch everything, by making every class prediction be a separate instance
-            bb_per_im = bb_per_im.view(-1, 4)
-            sc_per_im = sc_per_im.view(-1, 1)
-            lbl_per_im = lbl_per_im.view(-1, 1)
+            bb_per_im = bb_per_im.reshape(-1, 4)
+            sc_per_im = sc_per_im.reshape(-1)
+            lbl_per_im = lbl_per_im.reshape(-1)
 
             # remove low scoring boxes
             lwl_thres = torch.nonzero(scores > self.score_thres).squeeze(1)
