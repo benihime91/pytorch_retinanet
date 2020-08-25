@@ -240,14 +240,14 @@ class Retinanet(nn.Module):
             all_scores.append(sc_per_im)
             all_labels.append(lbl_per_im)
 
-        # Create Final Detections
-        detections.append(
-            {
-                "boxes": torch.cat(all_boxes, dim=0),
-                "scores": torch.cat(all_scores, dim=0),
-                "labels": torch.cat(all_labels, dim=0),
-            }
-        )
+            # Update Detections
+            detections.append(
+                {
+                    "boxes": torch.cat(all_boxes, dim=0),
+                    "scores": torch.cat(all_scores, dim=0),
+                    "labels": torch.cat(all_labels, dim=0),
+                }
+            )
 
         return detections
 
