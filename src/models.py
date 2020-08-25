@@ -215,8 +215,8 @@ class Retinanet(nn.Module):
 
             # batch everything, by making every class prediction be a separate instance
             bb_per_im = bb_per_im.view(-1, 4)
-            sc_per_im = sc_per_im.view(-1, 4)
-            lbl_per_im = lbl_per_im.view(-1, 4)
+            sc_per_im = sc_per_im.view(-1, 1)
+            lbl_per_im = lbl_per_im.view(-1, 1)
 
             # remove low scoring boxes
             lwl_thres = torch.nonzero(scores > self.score_thres).squeeze(1)
