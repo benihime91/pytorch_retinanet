@@ -186,10 +186,7 @@ class Retinanet(nn.Module):
         labels = torch.arange(num_classes, device=device)
         labels = labels.view(1, -1).expand_as(scores)
 
-        detections = torch.jit.annotate(List[Dict[str, Tensor]], [])
-
         all_boxes, all_scores, all_labels = [], [], []
-        detections = []
 
         for bb_per_im, sc_per_im, lbl_per_im, ancs_per_im, im_sz in zip(
             bboxes, scores, labels, anchors, im_szs
