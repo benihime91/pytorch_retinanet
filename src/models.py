@@ -86,16 +86,15 @@ class Retinanet(nn.Module):
     ) -> None:
 
         super(Retinanet, self).__init__()
-
+        
+        # Set Parameters
         num_classes = ifnone(num_classes, NUM_CLASSES)
         backbone_kind = ifnone(backbone_kind, BACKBONE)
         prior = ifnone(prior, PRIOR)
         pretrained = ifnone(pretrained, PRETRAINED_BACKBONE)
         nms_thres = ifnone(nms_thres, NMS_THRES)
         score_thres = ifnone(score_thres, SCORE_THRES)
-        max_detections_per_images = ifnone(
-            max_detections_per_images, MAX_DETECTIONS_PER_IMAGE
-        )
+        max_detections_per_images = ifnone(max_detections_per_images, MAX_DETECTIONS_PER_IMAGE)
         freeze_bn = ifnone(freeze_bn, FREEZE_BN)
         min_size = ifnone(min_size, MIN_IMAGE_SIZE)
         max_size = ifnone(max_size, MAX_IMAGE_SIZE)
@@ -103,33 +102,17 @@ class Retinanet(nn.Module):
         image_std = ifnone(image_std, STD)
         anchor_generator = ifnone(anchor_generator, AnchorGenerator())
 
-        # The reason for the 0.05 is because that is what appears to be used by other systems as well,
-        # such as faster rcnn and Detectron.
-        assert (
-            backbone_kind in __small__ + __big__
-        ), f" Expected `backbone_kind` to be one of {__small__+__big__} got {backbone_kind}"
+        if backbone_kind not in __small__ + __big__:
+            raise ValueError('Expected `backbone_kind` to be one of {__small__+__big__} got {backbone_kind}')
 
-        # ------------------------------------------------------
-        # Assemble `RetinaNet`
-        # ------------------------------------------------------
-        # # Instantiate `GeneralizedRCNNTransform` to resize inputs
         self.transform_inputs = GeneralizedRCNNTransform(min_size, max_size, image_mean, image_std)
-        # Get the back bone of the Model
         self.backbone_kind = backbone_kind
         self.backbone = get_backbone(self.backbone_kind, pretrained, freeze_bn=freeze_bn)
-        # # Grab the backbone output channels
         self.fpn_szs = self._get_backbone_ouputs()
-        # # Instantiate the `FPN`
         self.fpn = FPN(self.fpn_szs[0], self.fpn_szs[1], self.fpn_szs[2], out_channels=256)
-        # # Instantiate anchor Generator
         self.anchor_generator = anchor_generator
         self.num_anchors = self.anchor_generator.num_cell_anchors[0]
-        # # Instantiate `RetinaNetHead`
         self.retinanet_head = RetinaNetHead(256, 256, self.num_anchors, num_classes, prior)
-        
-        # ------------------------------------------------------
-        # Model Parameters
-        # ------------------------------------------------------
         self.score_thres = score_thres
         self.nms_thres = nms_thres
         self.detections_per_img = max_detections_per_images
@@ -249,32 +232,25 @@ class Retinanet(nn.Module):
         if self.training and targets is None:
             raise ValueError("In training Model, `targets` must be given")
 
-        # Grab the original Image sizes
         orig_im_szs = []
 
-        # store the original img szs
         for im in images:
             val = im.shape[-2:]
             assert len(val) == 2
             orig_im_szs.append((val[0], val[1]))
 
-        # Forward pass
         images, targets = self.transform_inputs(images, targets)
-        feature_maps = self.backbone(images.tensors)
-        feature_maps = self.fpn(feature_maps)
-        anchors = self.anchor_generator(images, feature_maps)
-        outputs = self.retinanet_head(feature_maps)
+        feature_maps    = self.backbone(images.tensors)
+        feature_maps    = self.fpn(feature_maps)
+        anchors         = self.anchor_generator(images, feature_maps)
+        outputs         = self.retinanet_head(feature_maps)
 
-        # Instatiate loss and detections dictionary
         losses = {}
         detections = torch.jit.annotate(List[Dict[str, Tensor]], [])
 
-        # Compute Loss or Detections
         if self.training:
-            # Comput Loss
             losses = self.compute_loss(targets, outputs, anchors)
         else:
-            # compute the detections
             with torch.no_grad():
                 detections = self.process_detections(outputs, anchors, images.image_sizes)
                 detections = self.transform_inputs.postprocess(detections, images.image_sizes, orig_im_szs)
