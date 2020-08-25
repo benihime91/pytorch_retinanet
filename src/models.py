@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.functional import Tensor
 from torchvision.models.detection.transform import GeneralizedRCNNTransform
-from torchvision.ops.boxes import batched_nms, clip_boxes_to_image, remove_small_boxes
+from torchvision.ops import boxes as ops
 
 from .config import *
 from .backbone import get_backbone
@@ -113,28 +113,20 @@ class Retinanet(nn.Module):
         # Assemble `RetinaNet`
         # ------------------------------------------------------
         # # Instantiate `GeneralizedRCNNTransform` to resize inputs
-        self.transform_inputs = GeneralizedRCNNTransform(
-            min_size, max_size, image_mean, image_std
-        )
+        self.transform_inputs = GeneralizedRCNNTransform(min_size, max_size, image_mean, image_std)
         # Get the back bone of the Model
         self.backbone_kind = backbone_kind
-        self.backbone = get_backbone(
-            self.backbone_kind, pretrained, freeze_bn=freeze_bn
-        )
+        self.backbone = get_backbone(self.backbone_kind, pretrained, freeze_bn=freeze_bn)
         # # Grab the backbone output channels
         self.fpn_szs = self._get_backbone_ouputs()
         # # Instantiate the `FPN`
-        self.fpn = FPN(
-            self.fpn_szs[0], self.fpn_szs[1], self.fpn_szs[2], out_channels=256
-        )
+        self.fpn = FPN(self.fpn_szs[0], self.fpn_szs[1], self.fpn_szs[2], out_channels=256)
         # # Instantiate anchor Generator
         self.anchor_generator = anchor_generator
         self.num_anchors = self.anchor_generator.num_cell_anchors[0]
         # # Instantiate `RetinaNetHead`
-        self.retinanet_head = RetinaNetHead(
-            256, 256, self.num_anchors, num_classes, prior
-        )
-
+        self.retinanet_head = RetinaNetHead(256, 256, self.num_anchors, num_classes, prior)
+        
         # ------------------------------------------------------
         # Model Parameters
         # ------------------------------------------------------
@@ -150,13 +142,15 @@ class Retinanet(nn.Module):
                 self.backbone.backbone.layer3[1].conv2.out_channels,
                 self.backbone.backbone.layer4[1].conv2.out_channels,
             ]
+            return fpn_szs
+
         elif self.backbone_kind in __big__:
             fpn_szs = [
                 self.backbone.backbone.layer2[2].conv3.out_channels,
                 self.backbone.backbone.layer3[2].conv3.out_channels,
                 self.backbone.backbone.layer4[2].conv3.out_channels,
             ]
-        return fpn_szs
+            return fpn_szs
 
     def compute_loss(
         self,
@@ -171,7 +165,6 @@ class Retinanet(nn.Module):
         outputs: Dict[str, Tensor],
         anchors: List[Tensor],
         im_szs: List[Tuple[int, int]],
-        bg_clas: int = 0,
     ) -> Tuple[List[Tensor], List[Tensor], List[Tensor]]:
 
         "Process `outputs` and return the predicted bboxes, score, clas_labels above `detect_thresh`."
@@ -183,46 +176,61 @@ class Retinanet(nn.Module):
         device = class_logits.device
         num_classes = class_logits.shape[-1]
 
-        boxes_per_image = [boxes_in_image.shape[0] for boxes_in_image in anchors]
-        bboxes = bboxes.split(boxes_per_image, 0)
-        scores = scores.split(boxes_per_image, 0)
+        # create labels for each score
+        labels = torch.arange(num_classes, device=device)
+        labels = labels.view(1, -1).expand_as(scores)
 
-        all_boxes, all_scores, all_labels = [], [], []
-        
-        # Iterate over bbs, scs, ancs szs per Image
-        for bb_per_im, sc_per_im, ancs_per_im, im_sz in zip(bboxes, scores, anchors, im_szs):
-            # Convert the activations of the Model into bounding Bxes
+        detections = torch.jit.annotate(List[Dict[str, Tensor]], [])
+
+        for bb_per_im, sc_per_im, ancs_per_im, im_sz, lbl_per_im in zip(
+            bboxes, scores, anchors, im_szs, labels
+        ):
+
             bb_per_im = activ_2_bbox(bb_per_im, ancs_per_im)
-            # Clip boxes to Image
-            bb_per_im = clip_boxes_to_image(bb_per_im, im_sz)
-            # create labels for each prediction in each Image
-            lbl_per_im = torch.arange(num_classes, device=device)
-            lbl_per_im = lbl_per_im.view(1, -1).expand_as(sc_per_im)
-            # remove predictions with the background label
-            bb_per_im = bb_per_im[:, 1:]
-            sc_per_im = sc_per_im[:, 1:]
-            lbl_per_im = lbl_per_im[:, 1:]
-            # batch everything, by making every class prediction be a separate instance
-            bb_per_im = bb_per_im.reshape(-1, 4)
-            sc_per_im = sc_per_im.reshape(-1)
-            lbl_per_im = lbl_per_im.reshape(-1)
-            # remove low scoring boxes
-            lwl_thres = torch.nonzero(scores > self.score_thres).squeeze(1)
-            bb_per_im, sc_per_im, lbl_per_im = bb_per_im[lwl_thres], sc_per_im[lwl_thres], lbl_per_im[lwl_thres]
-            # remove empty boxes
-            keep = remove_small_boxes(bb_per_im, min_size=1e-02)
-            bb_per_im, sc_per_im, lbl_per_im = bb_per_im[keep], sc_per_im[keep], lbl_per_im[keep]
-            # non-maximum suppression, independently done per class
-            keep = batched_nms(bb_per_im, sc_per_im, lbl_per_im, self.nms_thres)
-            # keep only topk scoring predictions
-            keep = keep[:self.detections_per_img]
-            bb_per_im, sc_per_im, lbl_per_im = bb_per_im[keep], sc_per_im[keep], lbl_per_im[keep]
-            # Append processed predictions
-            all_boxes.append(bb_per_im)
-            all_scores.append(sc_per_im)
-            all_labels.append(lbl_per_im)
+            bb_per_im = ops.clip_boxes_to_image(bb_per_im, im_sz)
 
-        return all_boxes, all_scores, all_labels
+            all_boxes = []
+            all_scores = []
+            all_labels = []
+
+            for cls_idx in range(1, num_classes):
+                # remove low scoring boxes and grab the predictions corresponding to the cls_idx
+                inds = torch.gt(sc_per_im[:, cls_idx], self.score_thres)
+                bb_per_cls, sc_per_cls, lbl_per_cls = (
+                    bb_per_im[inds],
+                    sc_per_im[inds, cls_idx],
+                    lbl_per_im[inds, cls_idx],
+                )
+                # remove empty boxes
+                keep = ops.remove_small_boxes(bb_per_cls, min_size=1e-2)
+                bb_per_cls, sc_per_cls, lbl_per_cls = (
+                    bb_per_cls[keep],
+                    sc_per_cls[keep],
+                    lbl_per_cls[keep],
+                )
+                # non-maximum suppression, independently done per class
+                keep = ops.nms(bb_per_cls, sc_per_cls, self.nms_thres)
+                # keep only topk scoring predictions
+                keep = keep[: self.detections_per_img]
+                bb_per_cls, sc_per_cls, lbl_per_cls = (
+                    bb_per_cls[keep],
+                    sc_per_cls[keep],
+                    lbl_per_cls[keep],
+                )
+
+                all_boxes.append(bb_per_cls)
+                all_scores.append(sc_per_cls)
+                all_labels.append(lbl_per_cls)
+
+            detections.append(
+                {
+                    "boxes": torch.cat(all_boxes, dim=0),
+                    "scores": torch.cat(all_scores, dim=0),
+                    "labels": torch.cat(all_labels, dim=0),
+                }
+            )
+
+        return detections
 
     def _get_outputs(
         self, losses, detections
@@ -268,18 +276,7 @@ class Retinanet(nn.Module):
         else:
             # compute the detections
             with torch.no_grad():
-                boxes, scores, labels = self.process_detections(
-                    outputs, anchors, images.image_sizes
-                )
-                num_images = len(boxes)
-
-                for i in range(num_images):
-                    detections.append(
-                        {"boxes": boxes[i], "labels": labels[i], "scores": scores[i]}
-                    )
-
-                detections = self.transform_inputs.postprocess(
-                    detections, images.image_sizes, orig_im_szs
-                )
+                detections = self.process_detections(outputs, anchors, images.image_sizes)
+                detections = self.transform_inputs.postprocess(detections, images.image_sizes, orig_im_szs)
         # Return Outputs
         return self._get_outputs(losses, detections)
