@@ -43,27 +43,28 @@ class RetinaNetLosses(nn.Module):
         bbox_mask = matches >= 0
         if bbox_mask.sum() != 0:
             bbox_pred = bbox_pred[bbox_mask]
-            bbox_tgt  = bbox_tgt[matches[bbox_mask]]
-            bbox_tgt  = bbox_2_activ(bbox_tgt, anchors[bbox_mask])
-            bb_loss   = F.smooth_l1_loss(bbox_pred, bbox_tgt)
+            bbox_tgt = bbox_tgt[matches[bbox_mask]]
+            bbox_tgt = bbox_2_activ(bbox_tgt, anchors[bbox_mask])
+            bb_loss = F.smooth_l1_loss(bbox_pred, bbox_tgt)
         else:
-            bb_loss   = 0.0
-        
+            bb_loss = 0.0
+
         matches.add_(1)
         # filtering mask to filter `ignore` classes from the class predicitons
-        clas_tgt  = clas_tgt + 1
+        clas_tgt = clas_tgt + 1
         clas_mask = matches >= 0
         clas_pred = clas_pred[clas_mask]
-        
+
         # Add backgorund class at the index
         clas_tgt = torch.cat([clas_tgt.new_zeros(1).long(), clas_tgt])
-        
+
         # filter clas_targets
         clas_tgt = clas_tgt[matches[clas_mask]]
         clas_loss = self.focal_loss(clas_pred, clas_tgt) / torch.clamp(
             bbox_mask.sum(), min=1.0
         )
-        return clas_loss, bb_loss
+        total_loss = clas_loss + bb_loss
+        return total_loss, clas_loss, bb_loss
 
     def forward(
         self,
@@ -73,29 +74,32 @@ class RetinaNetLosses(nn.Module):
     ):
         # extract the class_predictions & bbox_predictions from the RetinaNet Head Outputs
         clas_preds, bbox_preds = head_outputs["cls_preds"], head_outputs["bbox_preds"]
-        loss = {}
-        loss["classification_loss"] = []
-        loss["regression_loss"] = []
+        losses = {}
+        losses["loss"] = []
+        losses["classification_loss"] = []
+        losses["regression_loss"] = []
         for cls_pred, bb_pred, targs, ancs in zip(
             clas_preds, bbox_preds, targets, anchors
         ):
             # Extract the Labels & boxes from the targets
             class_targs, bbox_targs = targs["labels"], targs["boxes"]
             # Compute loss
-            clas_loss, bb_loss = self.calc_loss(
+            loss, clas_loss, bb_loss = self.calc_loss(
                 ancs, cls_pred, bb_pred, class_targs, bbox_targs
             )
             # Append Losses
-            loss["classification_loss"].append(clas_loss)
-            loss["regression_loss"].append(bb_loss)
+            losses["loss"].append(loss)
+            losses["classification_loss"].append(clas_loss)
+            losses["regression_loss"].append(bb_loss)
         # Calculate Average
-        loss["classification_loss"] = sum(loss["classification_loss"]) / len(
-            loss["classification_loss"]
+        losses["classification_loss"] = sum(losses["classification_loss"]) / len(
+            losses["classification_loss"]
         )
-        loss["regression_loss"] = sum(loss["regression_loss"]) / len(
-            loss["regression_loss"]
+        losses["regression_loss"] = sum(losses["regression_loss"]) / len(
+            losses["regression_loss"]
         )
-        return loss
+        losses["loss"] = sum(losses["loss"]) / len(losses["loss"])
+        return losses
 
 
 def encode_class(idxs, n_classes):
