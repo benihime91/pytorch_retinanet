@@ -150,7 +150,7 @@ class Retinanet(nn.Module):
         im_szs: List[Tuple[int, int]],
     ) -> Tuple[List[Tensor], List[Tensor], List[Tensor]]:
 
-        "Process `outputs` and return the predicted bboxes, score, clas_labels above `detect_thresh`."
+        " Process `outputs` and return the predicted bboxes, score, clas_labels above `detect_thres` "
 
         class_logits = outputs.pop("cls_preds")
         bboxes = outputs.pop("bbox_preds")
@@ -207,7 +207,7 @@ class Retinanet(nn.Module):
 
             detections.append(
                 {
-                    "boxes": torch.cat(all_boxes, dim=0),
+                    "boxes":  torch.cat(all_boxes,  dim=0),
                     "scores": torch.cat(all_scores, dim=0),
                     "labels": torch.cat(all_labels, dim=0),
                 }

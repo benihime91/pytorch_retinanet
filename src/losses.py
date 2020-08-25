@@ -43,19 +43,21 @@ class RetinaNetLosses(nn.Module):
         bbox_mask = matches >= 0
         if bbox_mask.sum() != 0:
             bbox_pred = bbox_pred[bbox_mask]
-            bbox_tgt = bbox_tgt[matches[bbox_mask]]
-            bbox_tgt = bbox_2_activ(bbox_tgt, anchors[bbox_mask])
-            bb_loss = F.smooth_l1_loss(bbox_pred, bbox_tgt)
+            bbox_tgt  = bbox_tgt[matches[bbox_mask]]
+            bbox_tgt  = bbox_2_activ(bbox_tgt, anchors[bbox_mask])
+            bb_loss   = F.smooth_l1_loss(bbox_pred, bbox_tgt)
         else:
-            bb_loss = 0.0
+            bb_loss   = 0.0
+        
         matches.add_(1)
         # filtering mask to filter `ignore` classes from the class predicitons
-        clas_tgt = clas_tgt + 1
+        clas_tgt  = clas_tgt + 1
         clas_mask = matches >= 0
         clas_pred = clas_pred[clas_mask]
-        # Build targets :
+        
         # Add backgorund class at the index
         clas_tgt = torch.cat([clas_tgt.new_zeros(1).long(), clas_tgt])
+        
         # filter clas_targets
         clas_tgt = clas_tgt[matches[clas_mask]]
         clas_loss = self.focal_loss(clas_pred, clas_tgt) / torch.clamp(
@@ -105,7 +107,7 @@ def encode_class(idxs, n_classes):
     Arguments:
     --------
         idxs:  Tensor original class_targets with background class at index 0.
-        n_classes: Number of classes
+        n_classes: number of classes
     """
     target = idxs.new_zeros(len(idxs), n_classes).float()
     mask = idxs != 0
