@@ -4,11 +4,11 @@ import torch
 import torch.nn as nn
 from torch.functional import Tensor
 from torchvision.models.detection.transform import GeneralizedRCNNTransform
-from torchvision.ops.boxes import clip_boxes_to_image, remove_small_boxes, batched_nms
+from torchvision.ops.boxes import batched_nms, clip_boxes_to_image, remove_small_boxes
 
-from .anchors import AnchorGenerator
-from .backbone import get_backbone
 from .config import *
+from .backbone import get_backbone
+from .anchors import AnchorGenerator
 from .layers import FPN, RetinaNetHead
 from .utils import activ_2_bbox, ifnone
 
@@ -162,7 +162,7 @@ class Retinanet(nn.Module):
         targets: List[Dict[str, Tensor]],
         outputs: Dict[str, Tensor],
         anchors: List[Tensor],
-    ):
+    ) -> Dict[str, Tensor]:
         return self.retinanet_head.compute_loss(targets, outputs, anchors)
 
     def process_detections(
@@ -171,7 +171,8 @@ class Retinanet(nn.Module):
         anchors: List[Tensor],
         im_szs: List[Tuple[int, int]],
         bg_clas: int = 0,
-    ):
+    ) -> Tuple[List[Tensor], List[Tensor], List[Tensor]]:
+
         "Process `outputs` and return the predicted bboxes, score, clas_labels above `detect_thresh`."
 
         class_logits = outputs.pop("cls_preds")
@@ -240,62 +241,12 @@ class Retinanet(nn.Module):
             all_scores.append(sc_per_im)
             all_labels.append(lbl_per_im)
 
-            # Update Detections
-            detections.append(
-                {
-                    "boxes": torch.cat(all_boxes, dim=0),
-                    "scores": torch.cat(all_scores, dim=0),
-                    "labels": torch.cat(all_labels, dim=0),
-                }
-            )
+        return all_boxes, all_scores, all_labels
 
-        return detections
+    def _get_outputs(
+        self, losses, detections
+    ) -> Union[Dict[str, Tensor], List[Dict[str, Tensor]]]:
 
-        #     # Loop over all classes from [1, num_classes)
-        #     for class_index in range(1, num_classes):
-
-        #         # Grab the class_index in scores where scores is > score_thres
-        #         inds = torch.gt(sc_per_im[:, class_index], self.score_thres)
-        #         bb_per_cls, sc_per_cls, lbl_per_cls = (
-        #             bb_per_im[inds],
-        #             sc_per_im[inds, class_index],
-        #             lbl_per_im[inds, class_index],
-        #         )
-
-        #         # remove empty boxes
-        #         keep = remove_small_boxes(bb_per_cls, min_size=1e-2)
-        #         bb_per_cls, sc_per_cls, lbl_per_cls = (
-        #             bb_per_cls[keep],
-        #             sc_per_cls[keep],
-        #             lbl_per_cls[keep],
-        #         )
-
-        #         # non-maximum suppression, independently done per class
-        #         keep = nms(bb_per_cls, sc_per_cls, self.nms_thres)
-
-        #         # keep only topk scoring predictions
-        #         keep = keep[: self.detections_per_img]
-        #         bb_per_cls, sc_per_cls, lbl_per_cls = (
-        #             bb_per_cls[keep],
-        #             sc_per_cls[keep],
-        #             lbl_per_cls[keep],
-        #         )
-
-        #         all_boxes.append(bb_per_cls)
-        #         all_scores.append(sc_per_cls)
-        #         all_labels.append(lbl_per_cls)
-
-        #     detections.append(
-        #         {
-        #             "boxes": torch.cat(all_boxes, dim=0),
-        #             "scores": torch.cat(all_scores, dim=0),
-        #             "labels": torch.cat(all_labels, dim=0),
-        #         }
-        #     )
-
-        # return detections
-
-    def _get_outputs(self, losses, detections):
         "if `training` return losses else return `detections`"
         if self.training:
             return losses
@@ -304,7 +255,7 @@ class Retinanet(nn.Module):
 
     def forward(
         self, images: List[Tensor], targets: Optional[List[Dict[str, Tensor]]] = None
-    ):
+    ) -> Union[Dict[str, Tensor], List[Dict[str, Tensor]]]:
 
         if self.training and targets is None:
             raise ValueError("In training Model, `targets` must be given")
@@ -321,9 +272,9 @@ class Retinanet(nn.Module):
         # Forward pass
         images, targets = self.transform_inputs(images, targets)
         feature_maps = self.backbone(images.tensors)
-        fpn_outputs = self.fpn(feature_maps)
-        anchors = self.anchor_generator(images, fpn_outputs)
-        outputs = self.retinanet_head(fpn_outputs)
+        feature_maps = self.fpn(feature_maps)
+        anchors = self.anchor_generator(images, feature_maps)
+        outputs = self.retinanet_head(feature_maps)
 
         # Instatiate loss and detections dictionary
         losses = {}
@@ -336,9 +287,16 @@ class Retinanet(nn.Module):
         else:
             # compute the detections
             with torch.no_grad():
-                detections = self.process_detections(
+                boxes, scores, labels = self.process_detections(
                     outputs, anchors, images.image_sizes
                 )
+                num_images = len(boxes)
+
+                for i in range(num_images):
+                    detections.append(
+                        {"boxes": boxes[i], "labels": labels[i], "scores": scores[i],}
+                    )
+
                 detections = self.transform_inputs.postprocess(
                     detections, images.image_sizes, orig_im_szs
                 )
