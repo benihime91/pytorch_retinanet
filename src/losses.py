@@ -60,11 +60,9 @@ class RetinaNetLosses(nn.Module):
 
         # filter clas_targets
         clas_tgt = clas_tgt[matches[clas_mask]]
-        clas_loss = self.focal_loss(clas_pred, clas_tgt) / torch.clamp(
-            bbox_mask.sum(), min=1.0
-        )
-        total_loss = clas_loss + bb_loss
-        return total_loss, clas_loss, bb_loss
+        clas_loss = self.focal_loss(clas_pred, clas_tgt) / torch.clamp(bbox_mask.sum(), min=1.0)
+
+        return clas_loss, bb_loss
 
     def forward(
         self,
@@ -84,11 +82,10 @@ class RetinaNetLosses(nn.Module):
             # Extract the Labels & boxes from the targets
             class_targs, bbox_targs = targs["labels"], targs["boxes"]
             # Compute loss
-            loss, clas_loss, bb_loss = self.calc_loss(
+            clas_loss, bb_loss = self.calc_loss(
                 ancs, cls_pred, bb_pred, class_targs, bbox_targs
             )
             # Append Losses
-            losses["loss"].append(loss)
             losses["classification_loss"].append(clas_loss)
             losses["regression_loss"].append(bb_loss)
         # Calculate Average
@@ -98,7 +95,7 @@ class RetinaNetLosses(nn.Module):
         losses["regression_loss"] = sum(losses["regression_loss"]) / len(
             losses["regression_loss"]
         )
-        losses["loss"] = sum(losses["loss"]) / len(losses["loss"])
+        losses["loss"] = losses["classification_loss"] + losses["regression_loss"]
         return losses
 
 
