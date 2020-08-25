@@ -170,6 +170,7 @@ class Retinanet(nn.Module):
         outputs: Dict[str, Tensor],
         anchors: List[Tensor],
         im_szs: List[Tuple[int, int]],
+        bg_clas: int = 0,
     ):
         "Process `outputs` and return the predicted bboxes, score, clas_labels above `detect_thresh`."
 
@@ -180,7 +181,7 @@ class Retinanet(nn.Module):
         num_classes = class_logits.shape[-1]
         scores = torch.sigmoid(class_logits)
 
-        # create labels for each score
+        # create labels for each score: here labels will be from 0 to num_classes
         labels = torch.arange(num_classes, device=device)
         labels = labels.view(1, -1).expand_as(scores)
 
@@ -189,6 +190,13 @@ class Retinanet(nn.Module):
         for bb_per_im, sc_per_im, lbl_per_im, ancs_per_im, im_sz in zip(
             bboxes, scores, labels, anchors, im_szs
         ):
+            # Remove all predicitons corresponding to the background clas from the predictions
+            i = torch.min(torch.nonzero(lbl_per_im - bg_clas))
+            bb_per_im, sc_per_im, lbl_per_im = (
+                bb_per_im[i:],
+                sc_per_im[i:],
+                lbl_per_im[i:],
+            )
 
             bb_per_im = activ_2_bbox(bb_per_im, ancs_per_im)
             bb_per_im = clip_boxes_to_image(bb_per_im, im_sz)
@@ -199,6 +207,7 @@ class Retinanet(nn.Module):
 
             # Loop over all classes from [1, num_classes)
             for class_index in range(1, num_classes):
+
                 # Grab the class_index in scores where scores is > score_thres
                 inds = torch.gt(sc_per_im[:, class_index], self.score_thres)
                 bb_per_cls, sc_per_cls, lbl_per_cls = (
