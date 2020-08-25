@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 from torch.functional import Tensor
 from torchvision.models.detection.transform import GeneralizedRCNNTransform
-from torchvision.ops.boxes import nms, clip_boxes_to_image, remove_small_boxes
+from torchvision.ops.boxes import clip_boxes_to_image, remove_small_boxes, batched_nms
 
 from .anchors import AnchorGenerator
 from .backbone import get_backbone
@@ -187,6 +187,9 @@ class Retinanet(nn.Module):
 
         detections = torch.jit.annotate(List[Dict[str, Tensor]], [])
 
+        all_boxes, all_scores, all_labels = [], [], []
+        detections = []
+
         for bb_per_im, sc_per_im, lbl_per_im, ancs_per_im, im_sz in zip(
             bboxes, scores, labels, anchors, im_szs
         ):
@@ -198,56 +201,99 @@ class Retinanet(nn.Module):
                 lbl_per_im[i:],
             )
 
+            # Convret the activations of the Model into boiunding Bxes
             bb_per_im = activ_2_bbox(bb_per_im, ancs_per_im)
+            # Clip boxes to Image
             bb_per_im = clip_boxes_to_image(bb_per_im, im_sz)
-
-            all_boxes = []
-            all_scores = []
-            all_labels = []
-
-            # Loop over all classes from [1, num_classes)
-            for class_index in range(1, num_classes):
-
-                # Grab the class_index in scores where scores is > score_thres
-                inds = torch.gt(sc_per_im[:, class_index], self.score_thres)
-                bb_per_cls, sc_per_cls, lbl_per_cls = (
-                    bb_per_im[inds],
-                    sc_per_im[inds, class_index],
-                    lbl_per_im[inds, class_index],
-                )
-
-                # remove empty boxes
-                keep = remove_small_boxes(bb_per_cls, min_size=1e-2)
-                bb_per_cls, sc_per_cls, lbl_per_cls = (
-                    bb_per_cls[keep],
-                    sc_per_cls[keep],
-                    lbl_per_cls[keep],
-                )
-
-                # non-maximum suppression, independently done per class
-                keep = nms(bb_per_cls, sc_per_cls, self.nms_thres)
-
-                # keep only topk scoring predictions
-                keep = keep[: self.detections_per_img]
-                bb_per_cls, sc_per_cls, lbl_per_cls = (
-                    bb_per_cls[keep],
-                    sc_per_cls[keep],
-                    lbl_per_cls[keep],
-                )
-
-                all_boxes.append(bb_per_cls)
-                all_scores.append(sc_per_cls)
-                all_labels.append(lbl_per_cls)
-
-            detections.append(
-                {
-                    "boxes": torch.cat(all_boxes, dim=0),
-                    "scores": torch.cat(all_scores, dim=0),
-                    "labels": torch.cat(all_labels, dim=0),
-                }
+            # Remove Small Boxes
+            keep = remove_small_boxes(bb_per_im, min_size=1e-02)
+            bb_per_im, sc_per_cls, lbl_per_cls = (
+                bb_per_im[keep],
+                sc_per_im[keep],
+                lbl_per_im[keep],
             )
 
+            # batch everything, by making every class prediction be a separate instance
+            bb_per_im = bb_per_im.view(-1, 4)
+            sc_per_im = sc_per_im.view(-1, 4)
+            lbl_per_im = lbl_per_im.view(-1, 4)
+
+            # remove low scoring boxes
+            lwl_thres = torch.nonzero(scores > self.score_thres).squeeze(1)
+            bb_per_im, sc_per_im, lbl_per_im = (
+                bb_per_im[lwl_thres],
+                sc_per_im[lwl_thres],
+                lbl_per_im[lwl_thres],
+            )
+
+            # non-max supression
+            keep = batched_nms(bb_per_im, sc_per_im, lbl_per_im, self.nms_thres)
+            # keep only the topk scoring preds
+            keep = keep[:, self.detections_per_img]
+            bb_per_im, sc_per_im, lbl_per_im = (
+                bb_per_im[keep],
+                sc_per_im[keep],
+                lbl_per_im[keep],
+            )
+
+            all_boxes.append(bb_per_im)
+            all_scores.append(sc_per_im)
+            all_labels.append(lbl_per_im)
+
+        # Create Final Detections
+        detections.append(
+            {
+                "boxes": torch.cat(all_boxes, dim=0),
+                "scores": torch.cat(all_scores, dim=0),
+                "labels": torch.cat(all_labels, dim=0),
+            }
+        )
+
         return detections
+
+        #     # Loop over all classes from [1, num_classes)
+        #     for class_index in range(1, num_classes):
+
+        #         # Grab the class_index in scores where scores is > score_thres
+        #         inds = torch.gt(sc_per_im[:, class_index], self.score_thres)
+        #         bb_per_cls, sc_per_cls, lbl_per_cls = (
+        #             bb_per_im[inds],
+        #             sc_per_im[inds, class_index],
+        #             lbl_per_im[inds, class_index],
+        #         )
+
+        #         # remove empty boxes
+        #         keep = remove_small_boxes(bb_per_cls, min_size=1e-2)
+        #         bb_per_cls, sc_per_cls, lbl_per_cls = (
+        #             bb_per_cls[keep],
+        #             sc_per_cls[keep],
+        #             lbl_per_cls[keep],
+        #         )
+
+        #         # non-maximum suppression, independently done per class
+        #         keep = nms(bb_per_cls, sc_per_cls, self.nms_thres)
+
+        #         # keep only topk scoring predictions
+        #         keep = keep[: self.detections_per_img]
+        #         bb_per_cls, sc_per_cls, lbl_per_cls = (
+        #             bb_per_cls[keep],
+        #             sc_per_cls[keep],
+        #             lbl_per_cls[keep],
+        #         )
+
+        #         all_boxes.append(bb_per_cls)
+        #         all_scores.append(sc_per_cls)
+        #         all_labels.append(lbl_per_cls)
+
+        #     detections.append(
+        #         {
+        #             "boxes": torch.cat(all_boxes, dim=0),
+        #             "scores": torch.cat(all_scores, dim=0),
+        #             "labels": torch.cat(all_labels, dim=0),
+        #         }
+        #     )
+
+        # return detections
 
     def _get_outputs(self, losses, detections):
         "if `training` return losses else return `detections`"
