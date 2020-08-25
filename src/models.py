@@ -190,7 +190,7 @@ class Retinanet(nn.Module):
         for bb_per_im, sc_per_im, lbl_per_im, ancs_per_im, im_sz in zip(
             bboxes, scores, labels, anchors, im_szs
         ):
-            # Remove all predicitons corresponding to the background clas from the predictions
+            # Remove all predicitons corresponding to the background class from the predictions
             i = torch.min(torch.nonzero(lbl_per_im - bg_clas))
             bb_per_im, sc_per_im, lbl_per_im = (
                 bb_per_im[i:],
