@@ -2,6 +2,7 @@ from typing import *
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.functional import Tensor
 from torchvision.models.detection.transform import GeneralizedRCNNTransform
 from torchvision.ops.boxes import batched_nms, clip_boxes_to_image, remove_small_boxes
@@ -177,63 +178,46 @@ class Retinanet(nn.Module):
 
         class_logits = outputs.pop("cls_preds")
         bboxes = outputs.pop("bbox_preds")
+        scores = F.softmax(class_logits, -1)
 
         device = class_logits.device
         num_classes = class_logits.shape[-1]
-        scores = torch.sigmoid(class_logits)
 
-        # create labels for each score: here labels will be from 0 to num_classes
-        labels = torch.arange(num_classes, device=device)
-        labels = labels.view(1, -1).expand_as(scores)
+        boxes_per_image = [boxes_in_image.shape[0] for boxes_in_image in anchors]
+        bboxes = bboxes.split(boxes_per_image, 0)
+        scores = scores.split(boxes_per_image, 0)
 
         all_boxes, all_scores, all_labels = [], [], []
-
-        for bb_per_im, sc_per_im, lbl_per_im, ancs_per_im, im_sz in zip(
-            bboxes, scores, labels, anchors, im_szs
-        ):
-            # Remove all predicitons corresponding to the background class from the predictions
-            i = torch.min(torch.nonzero(lbl_per_im - bg_clas))
-            bb_per_im, sc_per_im, lbl_per_im = (
-                bb_per_im[i:],
-                sc_per_im[i:],
-                lbl_per_im[i:],
-            )
-
-            # Convret the activations of the Model into boiunding Bxes
+        
+        # Iterate over bbs, scs, ancs szs per Image
+        for bb_per_im, sc_per_im, ancs_per_im, im_sz in zip(bboxes, scores, anchors, im_szs):
+            # Convert the activations of the Model into bounding Bxes
             bb_per_im = activ_2_bbox(bb_per_im, ancs_per_im)
             # Clip boxes to Image
             bb_per_im = clip_boxes_to_image(bb_per_im, im_sz)
-            # Remove Small Boxes
-            keep = remove_small_boxes(bb_per_im, min_size=1e-02)
-            bb_per_im, sc_per_im, lbl_per_im = (
-                bb_per_im[keep],
-                sc_per_im[keep],
-                lbl_per_im[keep],
-            )
-
+            # create labels for each prediction in each Image
+            lbl_per_im = torch.arange(num_classes, device=device)
+            lbl_per_im = lbl_per_im.view(1, -1).expand_as(sc_per_im)
+            # remove predictions with the background label
+            bb_per_im = bb_per_im[:, 1:]
+            sc_per_im = sc_per_im[:, 1:]
+            lbl_per_im = lbl_per_im[:, 1:]
             # batch everything, by making every class prediction be a separate instance
             bb_per_im = bb_per_im.reshape(-1, 4)
             sc_per_im = sc_per_im.reshape(-1)
             lbl_per_im = lbl_per_im.reshape(-1)
-
             # remove low scoring boxes
             lwl_thres = torch.nonzero(scores > self.score_thres).squeeze(1)
-            bb_per_im, sc_per_im, lbl_per_im = (
-                bb_per_im[lwl_thres],
-                sc_per_im[lwl_thres],
-                lbl_per_im[lwl_thres],
-            )
-
-            # non-max supression
+            bb_per_im, sc_per_im, lbl_per_im = bb_per_im[lwl_thres], sc_per_im[lwl_thres], lbl_per_im[lwl_thres]
+            # remove empty boxes
+            keep = remove_small_boxes(bb_per_im, min_size=1e-02)
+            bb_per_im, sc_per_im, lbl_per_im = bb_per_im[keep], sc_per_im[keep], lbl_per_im[keep]
+            # non-maximum suppression, independently done per class
             keep = batched_nms(bb_per_im, sc_per_im, lbl_per_im, self.nms_thres)
-            # keep only the topk scoring preds
-            keep = keep[: self.detections_per_img]
-            bb_per_im, sc_per_im, lbl_per_im = (
-                bb_per_im[keep],
-                sc_per_im[keep],
-                lbl_per_im[keep],
-            )
-
+            # keep only topk scoring predictions
+            keep = keep[:self.detections_per_img]
+            bb_per_im, sc_per_im, lbl_per_im = bb_per_im[keep], sc_per_im[keep], lbl_per_im[keep]
+            # Append processed predictions
             all_boxes.append(bb_per_im)
             all_scores.append(sc_per_im)
             all_labels.append(lbl_per_im)
@@ -291,7 +275,7 @@ class Retinanet(nn.Module):
 
                 for i in range(num_images):
                     detections.append(
-                        {"boxes": boxes[i], "labels": labels[i], "scores": scores[i],}
+                        {"boxes": boxes[i], "labels": labels[i], "scores": scores[i]}
                     )
 
                 detections = self.transform_inputs.postprocess(
