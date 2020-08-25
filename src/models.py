@@ -229,7 +229,7 @@ class Retinanet(nn.Module):
             # non-max supression
             keep = batched_nms(bb_per_im, sc_per_im, lbl_per_im, self.nms_thres)
             # keep only the topk scoring preds
-            keep = keep[:, self.detections_per_img]
+            keep = keep[:self.detections_per_img]
             bb_per_im, sc_per_im, lbl_per_im = (
                 bb_per_im[keep],
                 sc_per_im[keep],
