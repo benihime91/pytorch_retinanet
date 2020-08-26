@@ -113,11 +113,12 @@ class RetinaNetLosses(nn.Module):
         # extract the class_predictions & bbox_predictions from the RetinaNet Head Outputs
         clas_preds, bbox_preds = head_outputs["cls_preds"], head_outputs["bbox_preds"]
         losses = {}
-        losses["classification_loss"] = []
-        losses["regression_loss"] = []
 
-        for cls_pred, bb_pred, targs, ancs in zip(
-            clas_preds, bbox_preds, targets, anchors
+        clas_losses = torch.tensor(0.0).to(head_outputs[0].device)
+        bb_losses = torch.tensor(0.0).to(head_outputs[0].device)
+
+        for i, cls_pred, bb_pred, targs, ancs in enumerate(
+            zip(clas_preds, bbox_preds, targets, anchors)
         ):
 
             # Extract the Labels & boxes from the targets
@@ -126,17 +127,11 @@ class RetinaNetLosses(nn.Module):
             clas_loss, bb_loss = self.calc_loss(
                 ancs, cls_pred, bb_pred, class_targs, bbox_targs
             )
-            # Append Losses
-            losses["classification_loss"].append(clas_loss)
-            losses["regression_loss"].append(bb_loss)
+            # Increment losses
+            clas_losses = clas_losses + clas_loss / max(1, i)
+            bb_losses = bb_losses + bb_loss / max(1, i)
 
-        # Normalize losses
-        losses["classification_loss"] = sum(losses["classification_loss"]) / max(
-            1, len(losses["classification_loss"])
-        )
-
-        losses["regression_loss"] = sum(losses["regression_loss"]) / max(
-            1, len(losses["regression_loss"])
-        )
+        losses["classification_loss"] = clas_losses
+        losses["regression_loss"] = bb_losses
 
         return losses
