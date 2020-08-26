@@ -99,9 +99,7 @@ class RetinaNetLosses(nn.Module):
         )
 
         # classification loss
-        clas_loss = self.focal_loss(clas_pred, clas_tgt) / torch.clamp(
-            bbox_mask.sum(), min=1.0
-        )
+        clas_loss = self.focal_loss(clas_pred, clas_tgt)
 
         # Normalize Loss
         self.loss_normalizer = self.loss_normalizer_momentum * self.loss_normalizer + (
