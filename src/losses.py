@@ -51,7 +51,7 @@ class RetinaNetLosses(nn.Module):
             loss = torch.where(
                 cond,
                 0.5 * n ** 2 / self.smooth_l1_loss_beta,
-                n - 0.5 * self.smooth_l1_loss,
+                n - 0.5 * self.smooth_l1_loss_beta,
             )
         return loss.sum()
 
