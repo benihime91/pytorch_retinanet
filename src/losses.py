@@ -107,7 +107,7 @@ class RetinaNetLosses(nn.Module):
         self.loss_normalizer = self.loss_normalizer_momentum * self.loss_normalizer + (
             1 - self.loss_normalizer_momentum
         )
-        return clas_loss.div_(self.loss_normalizer), bb_loss.div_(self.loss_normalizer)
+        return clas_loss / self.loss_normalizer, bb_loss / self.loss_normalizer
 
     def forward(
         self,
