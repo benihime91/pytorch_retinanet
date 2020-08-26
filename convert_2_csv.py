@@ -28,6 +28,7 @@ def xml_to_csv(path):
                 ymax,
             )
             xml_list.append(value)
+
     column_name = [
         "filename",
         "width",
@@ -38,6 +39,7 @@ def xml_to_csv(path):
         "xmax",
         "ymax",
     ]
+
     xml_df = pd.DataFrame(xml_list, columns=column_name)
     return xml_df
 
@@ -46,19 +48,13 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
+    parser.add_argument("--path", help="path to xml files", type=str)
     parser.add_argument(
-        "-xml", "--path-to-xml-files", help="path to xml files", type=str
-    )
-    parser.add_argument(
-        "-output",
-        "--path-to-ouput-csv",
-        help="path to output csv",
-        type=str,
-        default="dataset.csv",
+        "--output", help="path to output csv", type=str, default="dataset.csv",
     )
 
     args = parser.parse_args()
     print("[INFO] Compiling csv from xml files")
-    df = xml_to_csv(args.xml)
+    df = xml_to_csv(args.path)
     df.to_csv(args.output, index=False)
-    print(f"[INFO] csv file saved to {args.ouput}")
+    print(f"[INFO] csv file saved to {args.output}")
