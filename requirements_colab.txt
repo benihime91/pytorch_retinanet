@@ -1,3 +1,0 @@
-pytorch-lightning
-git+https://github.com/albumentations-team/albumentations
-bounding_box
