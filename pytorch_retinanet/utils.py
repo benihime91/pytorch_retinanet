@@ -1,9 +1,9 @@
 import importlib
-import math
 from typing import *
+
 import torch
-from torchvision.ops.boxes import box_iou
 from torch.functional import Tensor
+from torchvision.ops.boxes import box_iou
 
 from .config import *
 
