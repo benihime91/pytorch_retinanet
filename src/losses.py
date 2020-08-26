@@ -117,19 +117,25 @@ class RetinaNetLosses(nn.Module):
         clas_losses = torch.tensor(0.0).to(clas_preds[0].device)
         bb_losses = torch.tensor(0.0).to(bbox_preds[0].device)
 
-        for i, cls_pred, bb_pred, targs, ancs in enumerate(
-            zip(clas_preds, bbox_preds, targets, anchors)
+        count = 0
+
+        for cls_pred, bb_pred, targs, ancs in zip(
+            clas_preds, bbox_preds, targets, anchors
         ):
 
             # Extract the Labels & boxes from the targets
             class_targs, bbox_targs = targs["labels"], targs["boxes"]
+            
             # Compute loss
             clas_loss, bb_loss = self.calc_loss(
                 ancs, cls_pred, bb_pred, class_targs, bbox_targs
             )
+            
             # Increment losses
-            clas_losses = clas_losses + clas_loss / max(1, i)
-            bb_losses = bb_losses + bb_loss / max(1, i)
+            clas_losses = clas_losses + clas_loss / max(1, count)
+            bb_losses = bb_losses + bb_loss / max(1, count)
+
+            count += 1
 
         losses["classification_loss"] = clas_losses
         losses["regression_loss"] = bb_losses
