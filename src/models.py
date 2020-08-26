@@ -166,7 +166,7 @@ class Retinanet(nn.Module):
 
         class_logits = outputs.pop("cls_preds")
         bboxes = outputs.pop("bbox_preds")
-        scores = F.softmax(class_logits, -1)
+        scores = torch.sigmoid(class_logits)
 
         device = class_logits.device
         num_classes = class_logits.shape[-1]
@@ -184,7 +184,7 @@ class Retinanet(nn.Module):
             bb_per_im = activ_2_bbox(bb_per_im, ancs_per_im)
             bb_per_im = ops.clip_boxes_to_image(bb_per_im, im_sz)
 
-            all_boxes  = []
+            all_boxes = []
             all_scores = []
             all_labels = []
 
@@ -219,7 +219,7 @@ class Retinanet(nn.Module):
 
             detections.append(
                 {
-                    "boxes" : torch.cat(all_boxes , dim=0),
+                    "boxes": torch.cat(all_boxes, dim=0),
                     "scores": torch.cat(all_scores, dim=0),
                     "labels": torch.cat(all_labels, dim=0),
                 }
