@@ -84,7 +84,7 @@ class RetinaNetLosses(nn.Module):
         # filtering mask to filter `ignore` classes from the class predicitons
         matches.add_(1)
         clas_mask = matches >= 0
-        clas_pred = clas_pred[clas_mask].long()
+        clas_pred = clas_pred[clas_mask]
 
         clas_tgt = clas_tgt + 1
 
