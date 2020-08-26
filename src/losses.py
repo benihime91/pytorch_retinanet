@@ -91,7 +91,8 @@ class RetinaNetLosses(nn.Module):
         clas_pred = clas_pred[clas_mask]
 
         clas_tgt = clas_tgt + 1
-        # Add background class to account for background in `matches`
+        # Add background class to account for background in `matches`. When there are no 
+        # matches
         clas_tgt = torch.cat([clas_tgt.new_zeros(1).long(), clas_tgt])
         clas_tgt = clas_tgt[matches[clas_mask]]
         clas_tgt = F.one_hot(clas_tgt, num_classes=self.n_c + 1)[
