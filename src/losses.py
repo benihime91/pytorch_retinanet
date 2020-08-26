@@ -34,17 +34,13 @@ class RetinaNetLosses(nn.Module):
             Loss tensor
         """
         ps = torch.sigmoid(clas_pred.detach())
-        ce_loss = F.binary_cross_entropy_with_logits(
-            clas_pred, clas_tgt, reduction="none"
-        )
-
         weights = clas_tgt * (1 - ps) + (1 - clas_tgt) * ps
-        loss = ce_loss * ((1 - weights) ** self.gamma)
-
         alphas = (1 - clas_tgt) * self.alpha + clas_tgt * (1 - self.alpha)
-        loss = alphas * loss
-
-        return loss.sum()
+        weights.pow_(self.gamma).mul_(alphas)
+        clas_loss = F.binary_cross_entropy_with_logits(
+            clas_pred, clas_tgt, weights, reduction="sum"
+        )
+        return clas_loss
 
     def smooth_l1_loss(self, input: Tensor, target: Tensor):
         if self.smooth_l1_loss_beta < 1e-5:
@@ -88,16 +84,17 @@ class RetinaNetLosses(nn.Module):
         # filtering mask to filter `ignore` classes from the class predicitons
         matches.add_(1)
         clas_mask = matches >= 0
-        clas_pred = clas_pred[clas_mask]
+        clas_pred = clas_pred[clas_mask].long()
 
         clas_tgt = clas_tgt + 1
+
         # Add background class to account for background in `matches`. When there are no
         # matches
         clas_tgt = torch.cat([clas_tgt.new_zeros(1).long(), clas_tgt])
         clas_tgt = clas_tgt[matches[clas_mask]]
-        clas_tgt = torch.LongTensor(
-            F.one_hot(clas_tgt, num_classes=self.n_c + 1)[:, 1:]
-        )  # no loss for the first(background) class
+
+        # no loss for the first(background) class
+        clas_tgt = F.one_hot(clas_tgt, num_classes=self.n_c + 1)[:, 1:].long()
 
         # classification loss
         clas_loss = self.focal_loss(clas_pred, clas_tgt) / torch.clamp(
