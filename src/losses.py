@@ -98,7 +98,7 @@ class RetinaNetLosses(nn.Module):
         # classification loss
         clas_loss = self.focal_loss(clas_pred, clas_tgt)
 
-        # Normalize Loss with Num Foregrounds
+        # Normalize Loss with num foregrounds
         return (
             clas_loss / torch.clamp(bbox_mask.sum(), min=1.0),
             bb_loss / torch.clamp(bbox_mask.sum(), min=1.0),
@@ -131,12 +131,12 @@ class RetinaNetLosses(nn.Module):
             losses["regression_loss"].append(bb_loss)
 
         # Normalize losses
-        losses["classification_loss"] = sum(losses["classification_loss"]) // len(
-            losses["classification_loss"]
+        losses["classification_loss"] = sum(losses["classification_loss"]) / max(
+            1, len(losses["classification_loss"])
         )
 
-        losses["regression_loss"] = sum(losses["regression_loss"]) // len(
-            losses["regression_loss"]
+        losses["regression_loss"] = sum(losses["regression_loss"]) / max(
+            1, len(losses["regression_loss"])
         )
 
         return losses
