@@ -69,4 +69,3 @@ FREEZE_BN: bool = True
 FOCAL_LOSS_GAMMA: float = 2.0
 FOCAL_LOSS_ALPHA: float = 0.25
 SMOOTH_L1_LOSS_BETA: float = 0.1
-
