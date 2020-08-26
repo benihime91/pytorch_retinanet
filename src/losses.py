@@ -73,11 +73,11 @@ class RetinaNetLosses(nn.Module):
         bbox_mask = matches >= 0
 
         if bbox_mask.sum() != 0:
-            gt_anchor_deltas = bbox_2_activ(bbox_tgt, anchors)
-            clas_pred = clas_pred[bbox_mask]
-            gt_anchor_deltas = gt_anchor_deltas[bbox_mask]
-            # regression loss
-            bb_loss = self.smooth_l1_loss(bbox_pred, gt_anchor_deltas)
+            bbox_pred = bbox_pred[bbox_mask]
+            bbox_tgt = bbox_tgt[matches[bbox_mask]]
+            bb_loss = self.smooth_l1_loss(
+                bbox_pred, bbox_2_activ(bbox_tgt, anchors[bbox_mask])
+            )
         else:
             bb_loss = 0.0
 
