@@ -131,11 +131,11 @@ class RetinaNetLosses(nn.Module):
             losses["regression_loss"].append(bb_loss)
 
         # Normalize losses
-        losses["classification_loss"] = sum(losses["classification_loss"]) / len(
+        losses["classification_loss"] = sum(losses["classification_loss"]) // len(
             losses["classification_loss"]
         )
 
-        losses["regression_loss"] = sum(losses["regression_loss"]) / len(
+        losses["regression_loss"] = sum(losses["regression_loss"]) // len(
             losses["regression_loss"]
         )
 
