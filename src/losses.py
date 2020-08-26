@@ -94,7 +94,9 @@ class RetinaNetLosses(nn.Module):
         clas_tgt = clas_tgt[matches[clas_mask]]
 
         # no loss for the first(background) class
-        clas_tgt = F.one_hot(clas_tgt, num_classes=self.n_c + 1)[:, 1:].long()
+        clas_tgt = F.one_hot(clas_tgt, num_classes=self.n_c + 1)[:, 1:].to(
+            clas_pred.dtype
+        )
 
         # classification loss
         clas_loss = self.focal_loss(clas_pred, clas_tgt) / torch.clamp(
