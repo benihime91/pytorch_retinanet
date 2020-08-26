@@ -2,7 +2,7 @@ import importlib
 import math
 from typing import *
 import torch
-from torchvision.ops.boxes import box_iou
+from torchvision.ops.boxes import box_iou, boxes
 from torch.functional import Tensor
 
 from .config import *
@@ -66,10 +66,10 @@ def bbox_2_activ(bboxes: Tensor, anchors: Tensor) -> Tensor:
 
     t_sizes = torch.log(bboxes[..., 2:] / anchors[..., 2:] + 1e-8)
 
-    boxes = torch.cat([t_centers, t_sizes], -1).div_(
+    deltas = torch.cat([t_centers, t_sizes], -1).div_(
         bboxes.new_tensor([[0.1, 0.1, 0.2, 0.2]])
     )
-    return boxes
+    return deltas
 
 
 def activ_2_bbox(activations: Tensor, anchors: Tensor) -> Tensor:
