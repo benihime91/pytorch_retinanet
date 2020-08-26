@@ -38,19 +38,6 @@ class RetinaNetLosses(nn.Module):
         )
         return clas_loss
 
-    def smooth_l1_loss(self, input: Tensor, target: Tensor):
-        if self.smooth_l1_loss_beta < 1e-5:
-            loss = torch.abs(input - target)
-        else:
-            n = torch.abs(input - target)
-            cond = n < self.smooth_l1_loss_beta
-            loss = torch.where(
-                cond,
-                0.5 * n ** 2 / self.smooth_l1_loss_beta,
-                n - 0.5 * self.smooth_l1_loss_beta,
-            )
-        return loss.sum()
-
     def calc_loss(
         self,
         anchors: Tensor,
@@ -71,7 +58,7 @@ class RetinaNetLosses(nn.Module):
         if bbox_mask.sum() != 0:
             bbox_pred = bbox_pred[bbox_mask]
             bbox_tgt = bbox_tgt[matches[bbox_mask]]
-            bb_loss = self.smooth_l1_loss(
+            bb_loss = F.smooth_l1_loss(
                 bbox_pred, bbox_2_activ(bbox_tgt, anchors[bbox_mask])
             )
         else:
@@ -99,10 +86,7 @@ class RetinaNetLosses(nn.Module):
         clas_loss = self.focal_loss(clas_pred, clas_tgt)
 
         # Normalize Loss with num foregrounds
-        return (
-            clas_loss / torch.clamp(bbox_mask.sum(), min=1.0),
-            bb_loss / torch.clamp(bbox_mask.sum(), min=1.0),
-        )
+        return bb_loss, clas_loss / torch.clamp(bbox_mask.sum(), min=1.0)
 
     def forward(
         self,
@@ -113,11 +97,8 @@ class RetinaNetLosses(nn.Module):
         # extract the class_predictions & bbox_predictions from the RetinaNet Head Outputs
         clas_preds, bbox_preds = head_outputs["cls_preds"], head_outputs["bbox_preds"]
         losses = {}
-
-        clas_losses = torch.tensor(0.0).to(clas_preds[0].device)
-        bb_losses = torch.tensor(0.0).to(bbox_preds[0].device)
-
-        count = 0.
+        losses["classification_loss"] = []
+        losses["regression_loss"] = []
 
         for cls_pred, bb_pred, targs, ancs in zip(
             clas_preds, bbox_preds, targets, anchors
@@ -125,19 +106,21 @@ class RetinaNetLosses(nn.Module):
 
             # Extract the Labels & boxes from the targets
             class_targs, bbox_targs = targs["labels"], targs["boxes"]
-            
+
             # Compute loss
-            clas_loss, bb_loss = self.calc_loss(
+            regression_loss, classification_loss = self.calc_loss(
                 ancs, cls_pred, bb_pred, class_targs, bbox_targs
             )
-            
+
             # Increment losses
-            clas_losses = clas_losses + clas_loss / max(1., count)
-            bb_losses = bb_losses + bb_loss / max(1., count)
+            losses["classification_loss"].append(classification_loss)
+            losses["regression_loss"].append(regression_loss)
 
-            count += 1.
-
-        losses["classification_loss"] = clas_losses
-        losses["regression_loss"] = bb_losses
+        losses["classification_loss"] = sum(losses["classification_loss"]) / len(
+            losses["classification_loss"]
+        )
+        losses["regression_loss"] = sum(losses["regression_loss"]) / len(
+            losses["regression_loss"]
+        )
 
         return losses
