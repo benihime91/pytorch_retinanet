@@ -114,8 +114,8 @@ class RetinaNetLosses(nn.Module):
         clas_preds, bbox_preds = head_outputs["cls_preds"], head_outputs["bbox_preds"]
         losses = {}
 
-        clas_losses = torch.tensor(0.0).to(head_outputs[0].device)
-        bb_losses = torch.tensor(0.0).to(head_outputs[0].device)
+        clas_losses = torch.tensor(0.0).to(clas_preds[0].device)
+        bb_losses = torch.tensor(0.0).to(bbox_preds[0].device)
 
         for i, cls_pred, bb_pred, targs, ancs in enumerate(
             zip(clas_preds, bbox_preds, targets, anchors)
