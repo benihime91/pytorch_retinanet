@@ -117,7 +117,7 @@ class RetinaNetLosses(nn.Module):
         clas_losses = torch.tensor(0.0).to(clas_preds[0].device)
         bb_losses = torch.tensor(0.0).to(bbox_preds[0].device)
 
-        count = 0
+        count = 0.
 
         for cls_pred, bb_pred, targs, ancs in zip(
             clas_preds, bbox_preds, targets, anchors
@@ -132,10 +132,10 @@ class RetinaNetLosses(nn.Module):
             )
             
             # Increment losses
-            clas_losses = clas_losses + clas_loss / max(1, count)
-            bb_losses = bb_losses + bb_loss / max(1, count)
+            clas_losses = clas_losses + clas_loss / max(1., count)
+            bb_losses = bb_losses + bb_loss / max(1., count)
 
-            count += 1
+            count += 1.
 
         losses["classification_loss"] = clas_losses
         losses["regression_loss"] = bb_losses
