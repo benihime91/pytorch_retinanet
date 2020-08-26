@@ -17,10 +17,6 @@ class RetinaNetLosses(nn.Module):
         self.gamma = FOCAL_LOSS_GAMMA
         self.smooth_l1_loss_beta = SMOOTH_L1_LOSS_BETA
 
-        # maintain an EMA of #foreground tostabilize the normalizer.
-        self.loss_normalizer = 100
-        self.loss_normalizer_momentum = 0.9
-
     def focal_loss(self, clas_pred: Tensor, clas_tgt: Tensor) -> Tensor:
         """
         Loss used in RetinaNet for dense detection: https://arxiv.org/abs/1708.02002.
@@ -86,6 +82,7 @@ class RetinaNetLosses(nn.Module):
         clas_mask = matches >= 0
         clas_pred = clas_pred[clas_mask]
 
+        # clas_tgt : [0, num_classes) -> [1, num_classes]
         clas_tgt = clas_tgt + 1
 
         # Add background class to account for background in `matches`. When there are no
@@ -101,11 +98,11 @@ class RetinaNetLosses(nn.Module):
         # classification loss
         clas_loss = self.focal_loss(clas_pred, clas_tgt)
 
-        # Normalize Loss
-        self.loss_normalizer = self.loss_normalizer_momentum * self.loss_normalizer + (
-            1 - self.loss_normalizer_momentum
+        # Normalize Loss with Num Foregrounds
+        return (
+            clas_loss / torch.clamp(bbox_mask.sum(), min=1.0),
+            bb_loss / torch.clamp(bbox_mask.sum(), min=1.0),
         )
-        return clas_loss / self.loss_normalizer, bb_loss / self.loss_normalizer
 
     def forward(
         self,
@@ -118,8 +115,6 @@ class RetinaNetLosses(nn.Module):
         losses = {}
         losses["classification_loss"] = []
         losses["regression_loss"] = []
-        # Total number of Images
-        num_ims = len(bbox_preds)
 
         for cls_pred, bb_pred, targs, ancs in zip(
             clas_preds, bbox_preds, targets, anchors
@@ -136,8 +131,12 @@ class RetinaNetLosses(nn.Module):
             losses["regression_loss"].append(bb_loss)
 
         # Normalize losses
-        losses["classification_loss"] = sum(losses["classification_loss"]) / num_ims
+        losses["classification_loss"] = sum(losses["classification_loss"]) / len(
+            losses["classification_loss"]
+        )
 
-        losses["regression_loss"] = sum(losses["regression_loss"]) / num_ims
+        losses["regression_loss"] = sum(losses["regression_loss"]) / len(
+            losses["regression_loss"]
+        )
 
         return losses
