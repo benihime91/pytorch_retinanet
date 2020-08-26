@@ -66,9 +66,8 @@ def bbox_2_activ(bboxes: Tensor, anchors: Tensor) -> Tensor:
 
     t_sizes = torch.log(bboxes[..., 2:] / anchors[..., 2:] + 1e-8)
 
-    return torch.cat([t_centers, t_sizes], -1).div_(
-        bboxes.new_tensor([[0.1, 0.1, 0.2, 0.2]])
-    )
+    boxes = torch.cat([t_centers, t_sizes], -1).div_(bboxes.new_tensor([[0.1, 0.1, 0.2, 0.2]]))
+    return boxes
 
 
 def activ_2_bbox(activations: Tensor, anchors: Tensor) -> Tensor:
@@ -80,14 +79,12 @@ def activ_2_bbox(activations: Tensor, anchors: Tensor) -> Tensor:
     activations.mul_(activations.new_tensor([[0.1, 0.1, 0.2, 0.2]]))
 
     centers = anchors[..., 2:] * activations[..., :2] + anchors[..., :2]
-    sizes = anchors[..., 2:] * torch.exp(activations[..., :2])
+    sizes   = anchors[..., 2:] * torch.exp(activations[..., :2])
 
     return convert_cthw_2_tlbr(torch.cat([centers, sizes], -1))
 
 
-def matcher(
-    anchors: Tensor, targets: Tensor, match_thr: float = None, back_thr: float = None
-):
+def matcher(anchors: Tensor, targets: Tensor, match_thr: float = None, back_thr: float = None):
     """
     Match `anchors` to targets. -1 is match to background, -2 is ignore.
     """
@@ -99,19 +96,20 @@ def matcher(
     # The classifier's target will be the category of that target.
     # - if the maximum overlap is between 0.4 and 0.5, we ignore that anchor in our loss computation.
     match_thr = ifnone(match_thr, IOU_THRESHOLDS_FOREGROUND)
-    back_thr = ifnone(back_thr, IOU_THRESHOLDS_BACKGROUND)
+    back_thr  = ifnone(back_thr, IOU_THRESHOLDS_BACKGROUND)
     assert match_thr > back_thr
 
     matches = anchors.new(anchors.size(0)).zero_().long() - 2
+    
     if targets.numel() == 0:
         return matches
 
     # Calculate IOU between given targets & anchors
-    iou_vals = compute_IOU(anchors, targets)
+    iou_vals   = compute_IOU(anchors, targets)
     # Grab the best ground_truth overlap
     vals, idxs = iou_vals.max(dim=1)
     # Grab the idxs
-    matches[vals < back_thr] = -1
+    matches[vals < back_thr]  = -1
     matches[vals > match_thr] = idxs[vals > match_thr]
     return matches
 
@@ -126,14 +124,12 @@ def compute_IOU(anchors, targets):
 
 def intersection(anchors, targets):
     "Compute the sizes of the intersections of `anchors` by `targets`."
-    a, t = anchors.size(0), targets.size(0)
-    ancs, tgts = (
-        anchors.unsqueeze(1).expand(a, t, 4),
-        targets.unsqueeze(0).expand(a, t, 4),
-    )
-    top_left_i = torch.max(ancs[..., :2], tgts[..., :2])
+    a, t        = anchors.size(0), targets.size(0)
+    ancs, tgts  = (anchors.unsqueeze(1).expand(a, t, 4), targets.unsqueeze(0).expand(a, t, 4))
+
+    top_left_i  = torch.max(ancs[..., :2], tgts[..., :2])
     bot_right_i = torch.min(ancs[..., 2:], tgts[..., 2:])
 
-    sizes = torch.clamp(bot_right_i - top_left_i, min=0)
+    sizes       = torch.clamp(bot_right_i - top_left_i, min=0)
 
     return sizes[..., 0] * sizes[..., 1]

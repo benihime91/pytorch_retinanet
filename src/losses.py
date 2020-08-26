@@ -15,54 +15,97 @@ class RetinaNetLosses(nn.Module):
         self.n_c = num_classes
         self.alpha = FOCAL_LOSS_ALPHA
         self.gamma = FOCAL_LOSS_GAMMA
+        self.smooth_l1_loss_beta = SMOOTH_L1_LOSS_BETA
+
+        # maintain an EMA of #foreground tostabilize the normalizer.
+        self.loss_normalizer = 100
+        self.loss_normalizer_momentum = 0.9
 
     def focal_loss(self, clas_pred: Tensor, clas_tgt: Tensor) -> Tensor:
         """
-        Focal Loss
+        Loss used in RetinaNet for dense detection: https://arxiv.org/abs/1708.02002.
+        Args:
+            1. inputs: A float tensor of arbitrary shape.
+                       The predictions for each example.
+            2. targets: A float tensor with the same shape as inputs. 
+                        Stores the binary classification label for each element in inputs
+                        (0 for the negative class and 1 for the positive class).
+        Returns:
+            Loss tensor
         """
-        encoded_tgt = encode_class(clas_tgt, clas_pred.size(1))
-
         ps = torch.sigmoid(clas_pred.detach())
-        weights = encoded_tgt * (1 - ps) + (1 - encoded_tgt) * ps
-        alphas = (1 - encoded_tgt) * self.alpha + encoded_tgt * (1 - self.alpha)
-        weights.pow_(self.gamma).mul_(alphas)
-        clas_loss = F.binary_cross_entropy_with_logits(
-            clas_pred, encoded_tgt, weights, reduction="sum"
+        ce_loss = F.binary_cross_entropy_with_logits(
+            clas_pred, clas_tgt, reduction="none"
         )
-        return clas_loss
+
+        weights = clas_tgt * (1 - ps) + (1 - clas_tgt) * ps
+        loss = ce_loss * ((1 - weights) ** self.gamma)
+
+        alphas = (1 - clas_tgt) * self.alpha + clas_tgt * (1 - self.alpha)
+        loss = alphas * loss
+
+        return loss.sum()
+
+    def smooth_l1_loss(self, input: Tensor, target: Tensor):
+        if self.smooth_l1_loss_beta < 1e-5:
+            loss = torch.abs(input - target)
+        else:
+            n = torch.abs(input - target)
+            cond = n < self.smooth_l1_loss_beta
+            loss = torch.where(
+                cond,
+                0.5 * n ** 2 / self.smooth_l1_loss_beta,
+                n - 0.5 * self.smooth_l1_loss,
+            )
+        return loss.sum()
 
     def calc_loss(
-        self, anchors, clas_pred, bbox_pred, clas_tgt, bbox_tgt, bg_clas=0
+        self,
+        anchors: Tensor,
+        clas_pred: Tensor,
+        bbox_pred: Tensor,
+        clas_tgt: Tensor,
+        bbox_tgt: Tensor,
     ) -> Tuple[Tensor, Tensor]:
-        """Calculate loss for class & box subnet of retinanet"""
-        i = torch.min(torch.nonzero(clas_tgt - bg_clas))
-        bbox_tgt, clas_tgt = bbox_tgt[i:], clas_tgt[i:] - 1 + bg_clas
+        """
+        Calculate loss for class & box subnet of retinanet.
+        """
         # Match boxes with anchors to get `background`, `ignore` and `foreground` positions
         matches = matcher(anchors, bbox_tgt)
+
         # create filtering mask to filter `background` and `ignore` classes from the bboxes
         bbox_mask = matches >= 0
-        if bbox_mask.sum() != 0:
-            bbox_pred = bbox_pred[bbox_mask]
-            bbox_tgt = bbox_tgt[matches[bbox_mask]]
-            bbox_tgt = bbox_2_activ(bbox_tgt, anchors[bbox_mask])
-            bb_loss = F.smooth_l1_loss(bbox_pred, bbox_tgt)
-        else:
-            bb_loss = 0.0
 
-        matches.add_(1)
+        gt_anchor_deltas = bbox_2_activ(bbox_tgt, anchors)
+        clas_pred = clas_pred[bbox_mask]
+        gt_anchor_deltas = gt_anchor_deltas[bbox_mask]
+
+        # regression loss
+        bb_loss = self.smooth_l1_loss(bbox_pred, gt_anchor_deltas)
+
         # filtering mask to filter `ignore` classes from the class predicitons
-        clas_tgt = clas_tgt + 1
+        matches.add_(1)
         clas_mask = matches >= 0
         clas_pred = clas_pred[clas_mask]
 
-        # Add backgorund class at the index
+        clas_tgt = clas_tgt + 1
+        # Add background class to account for background in `matches`
         clas_tgt = torch.cat([clas_tgt.new_zeros(1).long(), clas_tgt])
-
-        # filter clas_targets
         clas_tgt = clas_tgt[matches[clas_mask]]
-        clas_loss = self.focal_loss(clas_pred, clas_tgt) / torch.clamp(bbox_mask.sum(), min=1.0)
+        clas_tgt = F.one_hot(clas_tgt, num_classes=self.n_c + 1)[
+            :, 1:
+        ]  # no loss for the first(background) class
 
-        return clas_loss, bb_loss
+        # classification loss
+        clas_loss = self.focal_loss(clas_pred, clas_tgt) / torch.clamp(
+            bbox_mask.sum(), min=1.0
+        )
+
+        # Normalize Loss
+        self.loss_normalizer = self.loss_normalizer_momentum * self.loss_normalizer + (
+            1 - self.loss_normalizer_momentum
+        )
+        return clas_loss.div_(self.loss_normalizer), bb_loss.div_(self.loss_normalizer)
 
     def forward(
         self,
@@ -73,12 +116,15 @@ class RetinaNetLosses(nn.Module):
         # extract the class_predictions & bbox_predictions from the RetinaNet Head Outputs
         clas_preds, bbox_preds = head_outputs["cls_preds"], head_outputs["bbox_preds"]
         losses = {}
-        losses["loss"] = []
         losses["classification_loss"] = []
         losses["regression_loss"] = []
+        # Total number of Images
+        num_ims = len(bbox_preds)
+
         for cls_pred, bb_pred, targs, ancs in zip(
             clas_preds, bbox_preds, targets, anchors
         ):
+
             # Extract the Labels & boxes from the targets
             class_targs, bbox_targs = targs["labels"], targs["boxes"]
             # Compute loss
@@ -88,30 +134,10 @@ class RetinaNetLosses(nn.Module):
             # Append Losses
             losses["classification_loss"].append(clas_loss)
             losses["regression_loss"].append(bb_loss)
-        # Calculate Average
-        losses["classification_loss"] = sum(losses["classification_loss"]) / len(
-            losses["classification_loss"]
-        )
-        losses["regression_loss"] = sum(losses["regression_loss"]) / len(
-            losses["regression_loss"]
-        )
-        losses["loss"] = losses["classification_loss"] + losses["regression_loss"]
+
+        # Normalize losses
+        losses["classification_loss"] = sum(losses["classification_loss"]) / num_ims
+
+        losses["regression_loss"] = sum(losses["regression_loss"]) / num_ims
+
         return losses
-
-
-def encode_class(idxs, n_classes):
-    """
-    We will one-hot encode our targets with the convention
-    that the class of index 0 is the background,
-    which is the absence of any other classes.
-    
-    Arguments:
-    --------
-        idxs:  Tensor original class_targets with background class at index 0.
-        n_classes: number of classes
-    """
-    target = idxs.new_zeros(len(idxs), n_classes).float()
-    mask = idxs != 0
-    i1s = torch.LongTensor(list(range(len(idxs))))
-    target[i1s[mask], idxs[mask] - 1] = 1
-    return target

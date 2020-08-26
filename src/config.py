@@ -45,9 +45,8 @@ BACKGROUND_IDX: Any = -1
 # -----------------------------------------------------------------------------
 # `RetinaNet` Options
 # -----------------------------------------------------------------------------
-NUM_CLASSES: int = 81
-# number of output classes of the model(including the background).
-# `-1` will always be the background class. Target values should have values starting from 0
+NUM_CLASSES: int = 80
+# This is the number of foreground classes.
 
 # The network used to compute the features for the model.
 # Should be one of ['resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet101', 'resnet152'].
@@ -62,17 +61,11 @@ PRIOR: float = 0.01
 # weights from `Imagenet`
 PRETRAINED_BACKBONE: bool = True
 
-# Overlap threshold used for non-maximum suppression (suppress boxes with
-# IoU >= this threshold)
-NMS_THRES: float = 0.5
-
-# Minimum score threshold (assuming scores in a [0, 1] range); a value chosen to
-# balance obtaining high recall with not having too many low precision
-# detections that will slow down inference post processing steps (like NMS)
-# A default threshold of 0.0 increases AP by ~0.2-0.3 but significantly slows down
-# inference.
+# Inference cls score threshold, only anchors with score > INFERENCE_TH are
+# considered for inference (to improve speed)
 SCORE_THRES: float = 0.05
-MAX_DETECTIONS_PER_IMAGE: int = 300
+MAX_DETECTIONS_PER_IMAGE: int = 1000
+NMS_THRES: float = 0.5
 
 # Wether to freeze `BatchNormalization` layers of `backbone`
 FREEZE_BN: bool = True
@@ -80,3 +73,5 @@ FREEZE_BN: bool = True
 # Loss parameters
 FOCAL_LOSS_GAMMA: float = 2.0
 FOCAL_LOSS_ALPHA: float = 0.25
+SMOOTH_L1_LOSS_BETA: float = 0.1
+
