@@ -1,7 +1,7 @@
 import glob
-import pandas as pd
 import xml.etree.ElementTree as ET
-import argparse
+
+import pandas as pd
 
 
 def xml_to_csv(path):
@@ -42,19 +42,3 @@ def xml_to_csv(path):
 
     xml_df = pd.DataFrame(xml_list, columns=column_name)
     return xml_df
-
-
-if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--path", help="path to xml files", type=str)
-    parser.add_argument(
-        "--output", help="path to output csv", type=str, default="dataset.csv",
-    )
-
-    args = parser.parse_args()
-    print("[INFO] Compiling csv from xml files")
-    df = xml_to_csv(args.path)
-    df.to_csv(args.output, index=False)
-    print(f"[INFO] csv file saved to {args.output}")
