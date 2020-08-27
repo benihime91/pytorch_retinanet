@@ -115,4 +115,7 @@ class Visualizer:
                     bbox=dict(facecolor=rgb, edgecolor=rgb, alpha=0.8),
                 )
 
+        a.get_xaxis().set_visible(False)
+        a.get_yaxis().set_visible(False)
+        plt.axis("off")
         plt.show()
