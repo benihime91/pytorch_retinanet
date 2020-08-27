@@ -7,11 +7,12 @@ from torch.functional import Tensor
 from torchvision.models.detection.transform import GeneralizedRCNNTransform
 from torchvision.ops import boxes as ops
 
-from .config import *
-from .backbone import get_backbone
 from .anchors import AnchorGenerator
+from .backbone import get_backbone
+from .config import *
 from .layers import FPN, RetinaNetHead
-from .utils import activ_2_bbox, ifnone
+from .utils.general_utils.utilities import ifnone
+from .utils.modelling.box_utils import activ_2_bbox
 
 __small__ = ["resnet18", "resnet34"]
 __big__ = ["resnet50", "resnet101", "resnet101", "resnet152"]
