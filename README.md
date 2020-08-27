@@ -1,9 +1,10 @@
 # pytorch_retinanet
 A simple implementations of `Retinanet` for `object detection` as described in the paper [Focal Loss for Dense Object Detection](https://arxiv.org/abs/1708.02002).
 
-> This project uses [PyTorch](https://pytorch.org/)
-> For trainig it is recommended to use : [PyTorchLightning](https://github.com/PyTorchLightning/pytorch-lightning). Ready to use scripts will be utilizing PyTorchLightning.
-> I also plan to use [Hydra](https://github.com/facebookresearch/hydra) to maintain my config files and [Albumentaitons](https://github.com/albumentations-team/albumentations) for image transformations.
+> This project uses [`PyTorch`](https://pytorch.org/). 
+
+
+> For training it is recommended to use [`PyTorchLightning`](https://github.com/PyTorchLightning/pytorch-lightning). Ready to use scripts will be utilizing PyTorchLightning. I also plan to use [`Hydra`](https://github.com/facebookresearch/hydra) to maintain the config files and [`Albumentations`](https://github.com/albumentations-team/albumentations) for image transformations/augmentations.
 
 ## TODO: 
 - [x] Create `Anchor Generator`.
