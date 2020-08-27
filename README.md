@@ -28,6 +28,6 @@ A simple implementations of `Retinanet` for `object detection` as described in t
 - 27 August 2020:
   - Started training on [Pascal VOC 2007](http://host.robots.ox.ac.uk/pascal/VOC/voc2007/index.html).
   - Ran into errors mainly due to albumentations removing boxes.
-  - fixed my image transformation pipeline.
+  - Fixed my image transformation pipeline.
   - Useg PyTorchLightning Trainer : it's just awesome. 😎 
   - Trainining is going on smoothly. [notebook](https://github.com/benihime91/pytorch_retinanet/blob/master/references/train_pascal_2007.ipynb).
