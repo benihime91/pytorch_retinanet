@@ -15,11 +15,15 @@ A simple implementations of `Retinanet` for `object detection` as described in t
 - [x] Decode `Retinanet Predictions`. 
 - [x] Create `Dataset` for Loading Custom Data. [Preferably from CSV].
 - [x] Test model training on toy dataset.
-- [x] Check `Training`. [Failing: in losses.py : cuda error]
-- [x] Fix `cuda` errors in losses.py
-- [x] Evaluation using `COCO API`. (scripts taken from: https://github.com/PyTorchLightning/wheat)
-- [x] Fix `nan` losses during training.
+  - [x] Check `Training`. [Failing: in losses.py : cuda error]
+  - [x] Fix `cuda` errors in losses.py
+  - [x] Evaluation using `COCO API`. (scripts taken from: https://github.com/PyTorchLightning/wheat)
+  - [x] Fix `nan` losses during training.
 - [ ] Train on Pascal VOC 2007.
+  - [x] Fix augmentation pipeline
+  - [x] Log wandb & TensorBoard
+  - [x] Evaluation using `COCO API`. (scripts taken from: https://github.com/PyTorchLightning/wheat)
+  - [ ] Final `COCO` mAP: 
 - [ ] Ready made easy to use scripts for `training` & `inference`.
 - [ ] Train on COCO dataset. (Not sure if I have the resources)
 
