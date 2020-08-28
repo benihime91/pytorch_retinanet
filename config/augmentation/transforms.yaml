@@ -4,18 +4,7 @@
 # Augmentations for `train Dataset`
 augmentation:
   train:
-    # Specify augments here
-    # class_name : name of the albumentation function
-    # p : probability
     augs:
-      - class_name: albumentations.Flip
-        params:
-          p: 0.6
-
-      - class_name: albumentations.ShiftScaleRotate
-        params:
-          p: 0.6
-
       - class_name: albumentations.HorizontalFlip
         params:
           p: 0.6
@@ -32,6 +21,13 @@ augmentation:
         params:
           p: 0.6
 
+      - class_name: albumentations.RandomSizedBBoxSafeCrop
+        params:
+          width: 448
+          height: 336
+          erosion_rate: 0.2
+          p: 0.2
+
       - class_name: albumentations.ToFloat
         params:
           max_value: 255.0
@@ -41,7 +37,6 @@ augmentation:
         params:
           always_apply: True
 
-    # Bbox_parameters
     bbox_params:
       format: pascal_voc
       label_fields:
@@ -49,9 +44,6 @@ augmentation:
 
   # Augmentations for `valid dataset`
   valid:
-    # Specify augments here
-    # class_name : name of the albumentation function
-    # p : probability
     augs:
       - class_name: albumentations.ToFloat
         params:
@@ -62,9 +54,7 @@ augmentation:
         params:
           always_apply: True
 
-    # Bbox_parameters
     bbox_params:
-      # Bbox _params
       format: pascal_voc
       label_fields:
         - class_labels

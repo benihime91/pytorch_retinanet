@@ -1,2 +1,4 @@
 defaults:
   - augmentation: transforms
+  - scheduler: multi_step
+  - optimizer: adamW
