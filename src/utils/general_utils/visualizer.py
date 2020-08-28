@@ -110,7 +110,7 @@ class Visualizer:
                     x1 + lxc,
                     y1 - lyc,
                     conf_tx,
-                    fontsize=24,
+                    fontsize=12,
                     color="k",
                     bbox=dict(facecolor=rgb, edgecolor=rgb, alpha=0.8),
                 )
