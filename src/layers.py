@@ -10,14 +10,14 @@ from .config import *
 from .losses import RetinaNetLosses
 
 
-class FPN(nn.Module):
+class FeaturePyramid(nn.Module):
     """
-    This module implements :paper:`FPN`.
+    This module implements :paper:`FeaturePyramid`.
     It creates pyramid features built on top of some input feature maps.
     """
 
     def __init__(self, C_3_size, C_4_size, C_5_size, out_channels=256) -> None:
-        super(FPN, self).__init__()
+        super(FeaturePyramid, self).__init__()
         # `conv layers` to calculate `p3`
         self.conv_c3_1x1 = nn.Conv2d(C_3_size, out_channels, 1, 1, padding=0)
         self.conv_c3_3x3 = nn.Conv2d(out_channels, out_channels, 3, 1, padding=1)
@@ -73,7 +73,7 @@ class RetinaNetHead(nn.Module):
         out_channels (int): number of output feature channels.
         num_anchors (int) : number of anchors per_spatial_location.
         num_classes  (int): number of classes to be predicted.
-        prior      (float): value of `p estimated` by the model for the rare class (foreground) at the 
+        prior      (float): value of `p estimated` by the model for the rare class (foreground) at the
                             start of training.
     """
 
@@ -117,7 +117,7 @@ class RetinaNetClassSubnet(nn.Module):
     Classification Head for use in RetinaNet.
     This subnet  applies 4 3x3 conv layers, each with `out_channels`
     no of filters followed by a ReLU activation, followed by a 3x3
-    conv layer with (num_classes*num_anchors) filters follwed by a 
+    conv layer with (num_classes*num_anchors) filters follwed by a
     `sigmoid` prediction.
 
     Arguments:
@@ -130,8 +130,8 @@ class RetinaNetClassSubnet(nn.Module):
 
     Returns:
     -------
-        Tensor of shape [None, (height * width * num_anchors), num_classes] 
-        where each item correspond to the binary predictions 
+        Tensor of shape [None, (height * width * num_anchors), num_classes]
+        where each item correspond to the binary predictions
         per spatial location.
     """
 
@@ -190,7 +190,7 @@ class RetinaNetBoxSubnet(nn.Module):
     Box subnet for regeressing from anchor boxes to ground truth labels.
     This subnet  applies 4 3x3 conv layers, each with `out_channels`
     no of filters followed by a ReLU activation, followed by a 3x3
-    conv layer with (4 * num_anchors). For each anchor these 4 outputs, 
+    conv layer with (4 * num_anchors). For each anchor these 4 outputs,
     predict the relative offset between the abhor box & ground_truth.
 
     Arguments:

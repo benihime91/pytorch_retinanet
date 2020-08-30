@@ -7,9 +7,9 @@ A simple implementations of `Retinanet` for `object detection` as described in t
 ## TODO: 
 - [x] Create `Anchor Generator`.
 - [x] Create `ResNet` based `BackBone Model`.
-- [x] Create `FPN` architecture as described in https://arxiv.org/abs/1612.03144.
+- [x] Create `FeaturePyramid` architecture as described in https://arxiv.org/abs/1612.03144.
 - [x] [Focal Loss](https://arxiv.org/abs/1708.02002) & `Regeression` and `Classification` Head for `Retinanet`.
-- [x] Assemble Retinanet Using `BackBone` => `FPN` => `AnchorGenerator` => `Regeression` & `Classification` Head.
+- [x] Assemble Retinanet Using `BackBone` => `FeaturePyramid` => `AnchorGenerator` => `Regeression` & `Classification` Head.
 - [x] Decode `Retinanet Predictions`. 
 - [x] Test model training on toy dataset.
   - [x] Check `Training`. [Failing: in losses.py:`cuda error`]

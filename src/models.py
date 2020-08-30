@@ -10,7 +10,7 @@ from torchvision.ops import boxes as ops
 from .anchors import AnchorGenerator
 from .backbone import get_backbone
 from .config import *
-from .layers import FPN, RetinaNetHead
+from .layers import FeaturePyramid, RetinaNetHead
 from .utils.general_utils import ifnone
 from .utils.modelling import activ_2_bbox
 
@@ -117,9 +117,9 @@ class Retinanet(nn.Module):
         self.backbone = get_backbone(
             self.backbone_kind, pretrained, freeze_bn=freeze_bn
         )
-        self.fpn_szs = self._get_backbone_ouputs()
-        self.fpn = FPN(
-            self.fpn_szs[0], self.fpn_szs[1], self.fpn_szs[2], out_channels=256
+        self.FeaturePyramid_szs = self._get_backbone_ouputs()
+        self.FeaturePyramid = FeaturePyramid(
+            self.FeaturePyramid_szs[0], self.FeaturePyramid_szs[1], self.FeaturePyramid_szs[2], out_channels=256
         )
         self.anchor_generator = anchor_generator
         self.num_anchors = self.anchor_generator.num_cell_anchors[0]
@@ -133,20 +133,20 @@ class Retinanet(nn.Module):
 
     def _get_backbone_ouputs(self) -> List:
         if self.backbone_kind in __small__:
-            fpn_szs = [
+            FeaturePyramid_szs = [
                 self.backbone.backbone.layer2[1].conv2.out_channels,
                 self.backbone.backbone.layer3[1].conv2.out_channels,
                 self.backbone.backbone.layer4[1].conv2.out_channels,
             ]
-            return fpn_szs
+            return FeaturePyramid_szs
 
         elif self.backbone_kind in __big__:
-            fpn_szs = [
+            FeaturePyramid_szs = [
                 self.backbone.backbone.layer2[2].conv3.out_channels,
                 self.backbone.backbone.layer3[2].conv3.out_channels,
                 self.backbone.backbone.layer4[2].conv3.out_channels,
             ]
-            return fpn_szs
+            return FeaturePyramid_szs
 
     def compute_loss(
         self,
@@ -254,7 +254,7 @@ class Retinanet(nn.Module):
 
         images, targets = self.transform_inputs(images, targets)
         feature_maps = self.backbone(images.tensors)
-        feature_maps = self.fpn(feature_maps)
+        feature_maps = self.FeaturePyramid(feature_maps)
         anchors = self.anchor_generator(images, feature_maps)
         outputs = self.retinanet_head(feature_maps)
 
