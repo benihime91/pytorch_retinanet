@@ -6,7 +6,7 @@ from torch import nn
 from torch.functional import Tensor
 
 from .config import *
-from .utils.modelling.box_utils import bbox_2_activ, matcher
+from .utils.modelling import bbox_2_activ, matcher
 
 
 class RetinaNetLosses(nn.Module):

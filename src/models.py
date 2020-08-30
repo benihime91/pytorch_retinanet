@@ -11,8 +11,8 @@ from .anchors import AnchorGenerator
 from .backbone import get_backbone
 from .config import *
 from .layers import FPN, RetinaNetHead
-from .utils.general_utils.utilities import ifnone
-from .utils.modelling.box_utils import activ_2_bbox
+from .utils.general_utils import ifnone
+from .utils.modelling import activ_2_bbox
 
 __small__ = ["resnet18", "resnet34"]
 __big__ = ["resnet50", "resnet101", "resnet101", "resnet152"]
