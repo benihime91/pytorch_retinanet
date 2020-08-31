@@ -3,8 +3,7 @@ import math
 from typing import *
 
 import torch
-from torch import device, nn
-from torch.functional import Tensor
+from torch import Tensor, device, nn
 
 from torchvision.models.detection.image_list import ImageList
 

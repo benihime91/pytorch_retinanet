@@ -1,8 +1,7 @@
 from typing import *
 
 import torch.nn as nn
-from torch import nn as nn
-from torch.functional import Tensor
+from torch import Tensor
 
 import torchvision
 

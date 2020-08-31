@@ -3,8 +3,7 @@ from typing import *
 
 import torch
 import torch.nn.functional as F
-from torch import nn
-from torch.functional import Tensor
+from torch import Tensor, nn
 
 from .config import *
 from .utils.modelling import bbox_2_activ, matcher
