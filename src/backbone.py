@@ -1,9 +1,10 @@
 from typing import *
 
 import torch.nn as nn
-import torchvision
 from torch import nn as nn
 from torch.functional import Tensor
+
+import torchvision
 
 __all__ = ["resnet18", "resnet34", "resnet50", "resnet101", "resnet152"]
 
@@ -82,8 +83,9 @@ def get_backbone(
     Example:
         >>> m = get_backbone(kind='resnet18')
     """
-    assert kind in __all__, f"`kind` must be one of {__all__} got {kind}"
-    backbone = BackBone(
-        kind=kind, hook_fn=hook_outputs, pretrained=pretrained, freeze_bn=freeze_bn
-    )
+    if kind not in __all__:
+        raise ValueError('f"`kind` must be one of {__all__} got {kind}"')
+
+    backbone = BackBone(kind=kind, hook_fn=hook_outputs,
+                        pretrained=pretrained, freeze_bn=freeze_bn)
     return backbone

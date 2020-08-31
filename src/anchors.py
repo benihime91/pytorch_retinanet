@@ -5,6 +5,7 @@ from typing import *
 import torch
 from torch import device, nn
 from torch.functional import Tensor
+
 from torchvision.models.detection.image_list import ImageList
 
 from .config import *
@@ -93,7 +94,8 @@ class AnchorGenerator(nn.Module):
             aspect_ratios, self.num_features, "aspect_ratios"
         )
         self.offset = offset
-        self.cell_anchors = self._calculate_cell_anchors(self.sizes, self.aspect_ratios)
+        self.cell_anchors = self._calculate_cell_anchors(
+            self.sizes, self.aspect_ratios)
 
     def _calculate_cell_anchors(self, sizes, ratios):
         return self._calculate_anchors(sizes, ratios)
@@ -203,7 +205,7 @@ class AnchorGenerator(nn.Module):
           1. features (list[Tensor]): list of backbone feature maps on which to generate anchors.
 
         Returns:
-          list[Tensor]: a list of Tensors of len `num_images` containing all the anchors for 
+          list[Tensor]: a list of Tensors of len `num_images` containing all the anchors for
                         each feature map (i.e. the cell anchors repeated over all locations in
                         the feature map).
                         The number of anchors of each feature map is Hi x Wi x num_cell_anchors,

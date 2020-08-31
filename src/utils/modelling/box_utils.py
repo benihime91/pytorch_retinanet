@@ -2,6 +2,7 @@ from typing import *
 
 import torch
 from torch.functional import Tensor
+
 from torchvision.ops.boxes import box_iou
 
 from ...config import *

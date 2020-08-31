@@ -20,20 +20,27 @@ class FeaturePyramid(nn.Module):
         super(FeaturePyramid, self).__init__()
         # `conv layers` to calculate `p3`
         self.conv_c3_1x1 = nn.Conv2d(C_3_size, out_channels, 1, 1, padding=0)
-        self.conv_c3_3x3 = nn.Conv2d(out_channels, out_channels, 3, 1, padding=1)
+        self.conv_c3_3x3 = nn.Conv2d(
+            out_channels, out_channels, 3, 1, padding=1)
         # `conv layers` to calculate `p4`
         self.conv_c4_1x1 = nn.Conv2d(C_4_size, out_channels, 1, 1, padding=0)
-        self.conv_c4_3x3 = nn.Conv2d(out_channels, out_channels, 3, 1, padding=1)
+        self.conv_c4_3x3 = nn.Conv2d(
+            out_channels, out_channels, 3, 1, padding=1)
         # `conv layers` to calculate `p5`
         self.conv_c5_1x1 = nn.Conv2d(C_5_size, out_channels, 1, 1, padding=0)
-        self.conv_c5_3x3 = nn.Conv2d(out_channels, out_channels, 3, 1, padding=1)
+        self.conv_c5_3x3 = nn.Conv2d(
+            out_channels, out_channels, 3, 1, padding=1)
         # `conv layers` to calculate `p6`
-        self.conv_c6_3x3 = nn.Conv2d(C_5_size, out_channels, 3, stride=2, padding=1)
+        self.conv_c6_3x3 = nn.Conv2d(
+            C_5_size, out_channels, 3, stride=2, padding=1)
         # `conv layers` to calculate `p7`
-        self.conv_c7_3x3 = nn.Conv2d(out_channels, out_channels, 3, stride=2, padding=1)
+        self.conv_c7_3x3 = nn.Conv2d(
+            out_channels, out_channels, 3, stride=2, padding=1)
+
         # `upsample layer` to increase `output_size` for `elementwise-additions`
         # with previous pyramid level
         self.upsample_2x = nn.Upsample(scale_factor=2, mode="nearest")
+
         # Initialize with `kaiming_uniform`
         for m in self.children():
             if isinstance(m, nn.Conv2d):
@@ -99,7 +106,7 @@ class RetinaNetHead(nn.Module):
         targets: List[Dict[str, Tensor]],
         outputs: Dict[str, Tensor],
         anchors: List[Tensor],
-    ):
+    ) -> Dict[str, Tensor]:
         # Calculate Losses
         output_dict = self.losses(targets, outputs, anchors)
         return output_dict
@@ -177,7 +184,8 @@ class RetinaNetClassSubnet(nn.Module):
             # out: [num_batches, (num_anchors * num_classes), height, width ]
             N, _, H, W = x.shape
             x = x.view(N, -1, self.num_classes, H, W)
-            x = x.permute(0, 3, 4, 1, 2).contiguous().view(N, -1, self.num_classes)
+            x = x.permute(0, 3, 4, 1, 2).contiguous().view(
+                N, -1, self.num_classes)
             # out: [num_batches, (height*width*num_anchors), num_classes]
             cls_preds.append(x)
         # Concatenate along (height*wdth*num_anchors) dimension
@@ -223,6 +231,7 @@ class RetinaNetBoxSubnet(nn.Module):
         self.box_subnet_output = nn.Conv2d(
             out_channels, num_anchors * 4, 3, padding=1, stride=1
         )
+
         # Initialize the Final Layer as given in :paper: `RetinaNet`
         torch.nn.init.normal_(self.box_subnet_output.weight, std=0.01)
         torch.nn.init.zeros_(self.box_subnet_output.bias)

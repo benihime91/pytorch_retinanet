@@ -1,5 +1,3 @@
-from .visualizer import Visualizer
 from .convert_2_csv import xml_to_csv
-from .utilities import collate_fn
-from .utilities import load_obj
-from .utilities import ifnone
+from .utilities import collate_fn, ifnone, load_obj
+from .visualizer import Visualizer

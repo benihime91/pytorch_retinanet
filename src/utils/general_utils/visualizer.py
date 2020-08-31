@@ -1,9 +1,10 @@
 from typing import Dict, List, Optional, Tuple, Union
 
-import cv2
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
+
+import cv2
 
 from .utilities import ifnone
 

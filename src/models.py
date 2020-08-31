@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.functional import Tensor
+
 from torchvision.models.detection.transform import GeneralizedRCNNTransform
 from torchvision.ops import boxes as ops
 
@@ -33,7 +34,7 @@ class Retinanet(nn.Module):
           between 0 and W and values of y between 0 and H
         - labels (Int64Tensor[N]): the class label for each ground-truth box
 
-    The model returns a Dict[Tensor] during training, containing the `classification` and `regression` losses for 
+    The model returns a Dict[Tensor] during training, containing the `classification` and `regression` losses for
     the `RetinaNet` `classSubnet` & `BoxSubnet` repectively.
 
     During inference, the model requires only the input tensors, and returns the post-processed
@@ -47,23 +48,23 @@ class Retinanet(nn.Module):
     Arguments:
         - num_classes   (int): number of output classes of the model (excluding the background).
 
-        - backbone_kind (str): the network used to compute the features for the model. 
+        - backbone_kind (str): the network used to compute the features for the model.
                                currently support only `Resnet` networks.
         - prior       (float): Prior prob for rare case (i.e. foreground) at the beginning of training.
         - pretrianed   (bool): Wether the backbone should be `pretrained` or not.
-        - nms_thres   (float): Overlap threshold used for non-maximum suppression 
+        - nms_thres   (float): Overlap threshold used for non-maximum suppression
                                (suppress boxes with IoU >= this threshold).
         - score_thres (float): Minimum score threshold (assuming scores in a [0, 1] range.
         - max_detections_per_images(int): Number of proposals to keep after applying NMS.
         - freeze_bn   (bool) : Wether to freeze the `BatchNorm` layers of the `BackBone` network.
-        - anchor_generator(AnchorGenertor): Must be an instance of `AnchorGenerator`. 
+        - anchor_generator(AnchorGenertor): Must be an instance of `AnchorGenerator`.
                                             If None the default AnchorGenerator is used.
                                             see `config.py`
-        - min_size (int)     : `minimum size` of the image to be rescaled before 
+        - min_size (int)     : `minimum size` of the image to be rescaled before
                                feeding it to the backbone.
-        - max_size (int)     : `maximum size` of the image to be rescaled before 
+        - max_size (int)     : `maximum size` of the image to be rescaled before
                                feeding it to the backbone.
-        - image_mean (List[float]): mean values used for input normalization.   
+        - image_mean (List[float]): mean values used for input normalization.
         - image_std (List[float]) : std values used for input normalization.
 
     >>> For default values see `config.py`
@@ -162,7 +163,6 @@ class Retinanet(nn.Module):
         anchors: List[Tensor],
         im_szs: List[Tuple[int, int]],
     ) -> Tuple[List[Tensor], List[Tensor], List[Tensor]]:
-
         " Process `outputs` and return the predicted bboxes, score, clas_labels above `detect_thres` "
 
         class_logits = outputs.pop("cls_preds")
@@ -231,7 +231,6 @@ class Retinanet(nn.Module):
     def _get_outputs(
         self, losses, detections
     ) -> Union[Dict[str, Tensor], List[Dict[str, Tensor]]]:
-
         "if `training` return losses else return `detections`"
         if self.training:
             return losses

@@ -1,3 +1,4 @@
+
 from typing import *
 
 import torch
@@ -23,7 +24,7 @@ class RetinaNetLosses(nn.Module):
         Args:
             1. inputs: A float tensor of arbitrary shape.
                        The predictions for each example.
-            2. targets: A float tensor with the same shape as inputs. 
+            2. targets: A float tensor with the same shape as inputs.
                         Stores the binary classification label for each element in inputs
                         (0 for the negative class and 1 for the positive class).
         Returns:
@@ -72,8 +73,9 @@ class RetinaNetLosses(nn.Module):
         # clas_tgt : [0, num_classes) -> [1, num_classes]
         clas_tgt = clas_tgt + 1
 
-        # Add background class to account for background in `matches`. When there are no
-        # matches
+        # Add background class to account for background in `matches`.
+        # When there are no matches
+        # bg class is predicted when none of the others go out.
         clas_tgt = torch.cat([clas_tgt.new_zeros(1).long(), clas_tgt])
         clas_tgt = clas_tgt[matches[clas_mask]]
 
