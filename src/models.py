@@ -108,7 +108,7 @@ class Retinanet(nn.Module):
 
         if backbone_kind not in __small__ + __big__:
             raise ValueError(
-                "Expected `backbone_kind` to be one of {__small__+__big__} got {backbone_kind}"
+                f"Expected `backbone_kind` to be one of {__small__+__big__} got {backbone_kind}"
             )
 
         self.transform_inputs = GeneralizedRCNNTransform(
