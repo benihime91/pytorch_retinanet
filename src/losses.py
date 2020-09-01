@@ -98,7 +98,7 @@ class RetinaNetLosses(nn.Module):
 
         # Normalize Loss with num foregrounds
         return (
-            bb_loss.dtype(clas_loss.dtype) / torch.clamp(bbox_mask.sum(), min=1.0),
+            bb_loss.to(clas_loss.dtype) / torch.clamp(bbox_mask.sum(), min=1.0),
             clas_loss / torch.clamp(bbox_mask.sum(), min=1.0),
         )
 
