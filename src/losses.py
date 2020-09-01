@@ -111,8 +111,9 @@ class RetinaNetLosses(nn.Module):
         # extract the class_predictions & bbox_predictions from the RetinaNet Head Outputs
         clas_preds, bbox_preds = head_outputs["cls_preds"], head_outputs["bbox_preds"]
         losses = {}
-        losses["classification_loss"] = []
-        losses["regression_loss"] = []
+        # List to store losses
+        classification_loss = []
+        regression_loss = []
 
         for cls_pred, bb_pred, targs, ancs in zip(
             clas_preds, bbox_preds, targets, anchors
@@ -127,16 +128,15 @@ class RetinaNetLosses(nn.Module):
             )
 
             # Append Losses of all the batches
-            losses["classification_loss"].append(classification_loss)
-            losses["regression_loss"].append(regression_loss)
+            classification_loss.append(classification_loss)
+            regression_loss.append(regression_loss)
 
         # Average  the losses
-        losses["classification_loss"] = sum(losses["classification_loss"]) / len(
-            losses["classification_loss"]
-        )
+        classification_loss = sum(classification_loss) / len(targets)
 
-        losses["regression_loss"] = sum(losses["regression_loss"]) / len(
-            losses["regression_loss"]
-        )
+        regression_loss = sum(regression_loss) / len(targets)
 
+        # Add losses to dictionary
+        losses["classification_loss"] = classification_loss
+        losses["regression_loss"] = regression_loss
         return losses
