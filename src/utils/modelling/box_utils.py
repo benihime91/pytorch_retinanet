@@ -34,7 +34,7 @@ def bbox_2_activ(bboxes: Tensor, anchors: Tensor) -> Tensor:
 
     t_sizes = torch.log(bboxes[..., 2:] / anchors[..., 2:] + 1e-8)
 
-    deltas = torch.cat([t_centers, t_sizes], -1).div_(
+    deltas = torch.cat([t_centers, t_sizes], -1).mul_(
         bboxes.new_tensor([BBOX_REG_WEIGHTS])
     )
     return deltas
@@ -46,7 +46,7 @@ def activ_2_bbox(activations: Tensor, anchors: Tensor) -> Tensor:
     # Convert anchors to XYWH
     anchors = convert_tlbr_2_cthw(anchors)
 
-    activations.mul_(activations.new_tensor([BBOX_REG_WEIGHTS]))
+    activations.div_(activations.new_tensor([BBOX_REG_WEIGHTS]))
 
     centers = anchors[..., 2:] * activations[..., :2] + anchors[..., :2]
     sizes = anchors[..., 2:] * torch.exp(activations[..., :2])

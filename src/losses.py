@@ -14,6 +14,16 @@ class RetinaNetLosses(nn.Module):
         self.n_c = num_classes
         self.alpha = FOCAL_LOSS_ALPHA
         self.gamma = FOCAL_LOSS_GAMMA
+        self.beta = SMOOTH_L1_LOSS_BETA
+
+    def smooth_l1_loss(self, input: Tensor, target: Tensor) -> torch.Tensor:
+        if self.beta < 1e-5:
+            loss = torch.abs(input - target)
+        else:
+            n = torch.abs(input - target)
+            cond = n < self.beta
+            loss = torch.where(cond, 0.5 * n ** 2 / self.beta, n - 0.5 * self.beta)
+        return loss.sum()
 
     def focal_loss(self, clas_pred: Tensor, clas_tgt: Tensor) -> Tensor:
         """
@@ -51,14 +61,16 @@ class RetinaNetLosses(nn.Module):
         matches = matcher(anchors, bbox_tgt)
 
         # create filtering mask to filter `background` and `ignore` classes from the bboxes
+        # This is also number of foreground
         bbox_mask = matches >= 0
 
         if bbox_mask.sum() != 0:
             bbox_pred = bbox_pred[bbox_mask]
             bbox_tgt = bbox_tgt[matches[bbox_mask]]
-            bb_loss = F.smooth_l1_loss(
-                bbox_pred, bbox_2_activ(bbox_tgt, anchors[bbox_mask])
-            )
+            bbox_tgt = bbox_2_activ(
+                bbox_tgt, anchors[bbox_mask]
+            )  # match the targets with anchors to get the bboxes
+            bb_loss = self.smooth_l1_loss(bbox_pred, bbox_tgt)
         else:
             bb_loss = 0.0
 
@@ -85,14 +97,17 @@ class RetinaNetLosses(nn.Module):
         clas_loss = self.focal_loss(clas_pred, clas_tgt)
 
         # Normalize Loss with num foregrounds
-        return bb_loss, clas_loss / torch.clamp(bbox_mask.sum(), min=1.0)
+        return (
+            bb_loss.dtype(clas_loss.dtype) / torch.clamp(bbox_mask.sum(), min=1.0),
+            clas_loss / torch.clamp(bbox_mask.sum(), min=1.0),
+        )
 
     def forward(
         self,
         targets: List[Dict[str, Tensor]],
         head_outputs: List[Tensor],
         anchors: List[Tensor],
-    ):
+    ) -> Dict[str, Tensor]:
         # extract the class_predictions & bbox_predictions from the RetinaNet Head Outputs
         clas_preds, bbox_preds = head_outputs["cls_preds"], head_outputs["bbox_preds"]
         losses = {}
@@ -111,14 +126,15 @@ class RetinaNetLosses(nn.Module):
                 ancs, cls_pred, bb_pred, class_targs, bbox_targs
             )
 
-            # Increment losses
+            # Append Losses of all the batches
             losses["classification_loss"].append(classification_loss)
             losses["regression_loss"].append(regression_loss)
 
-        # Average of the losses
+        # Average  the losses
         losses["classification_loss"] = sum(losses["classification_loss"]) / len(
             losses["classification_loss"]
         )
+
         losses["regression_loss"] = sum(losses["regression_loss"]) / len(
             losses["regression_loss"]
         )

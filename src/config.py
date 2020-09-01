@@ -15,7 +15,7 @@ STD: List[float] = [0.229, 0.224, 0.225]
 # Size of the smallest side of the image during training
 MIN_IMAGE_SIZE: int = 600
 # Maximum size of the side of the image during training
-MAX_IMAGE_SIZE: int = 1333
+MAX_IMAGE_SIZE: int = 600
 
 
 # ----------------------------------------------------------------------------- #
@@ -61,13 +61,13 @@ PRIOR: float = 0.01
 FREEZE_BN: bool = True
 
 # Weights on (dx, dy, dw, dh) for normalizing Retinanet anchor regression targets
-BBOX_REG_WEIGHTS = [0.1, 0.1, 0.2, 0.2]
+BBOX_REG_WEIGHTS = [1.0, 1.0, 1.0, 1.0]
 
 # Inference cls score threshold, only anchors with score > INFERENCE_TH are
 # considered for inference (to improve speed)
 SCORE_THRES: float = 0.05
-MAX_DETECTIONS_PER_IMAGE: int = 1000
 NMS_THRES: float = 0.5
+MAX_DETECTIONS_PER_IMAGE: int = 1000
 
 # IoU overlap ratio bg & fg for labeling anchors.
 # Anchors with < bg are labeled negative (0)
@@ -79,3 +79,4 @@ IOU_THRESHOLDS_BACKGROUND: float = 0.4
 # Loss parameters
 FOCAL_LOSS_GAMMA: float = 2.0
 FOCAL_LOSS_ALPHA: float = 0.25
+SMOOTH_L1_LOSS_BETA: float = 0.1
