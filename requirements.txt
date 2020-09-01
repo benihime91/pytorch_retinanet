@@ -3,5 +3,4 @@ opencv-python
 git+https://github.com/albumentations-team/albumentations
 pycocotools
 matplotlib
-bounding-box
 hydra-core
