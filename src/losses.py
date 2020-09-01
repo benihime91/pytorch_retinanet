@@ -23,7 +23,7 @@ class RetinaNetLosses(nn.Module):
             n = torch.abs(input - target)
             cond = n < self.beta
             loss = torch.where(cond, 0.5 * n ** 2 / self.beta, n - 0.5 * self.beta)
-        return loss.sum()
+        return torch.tensor(loss.sum().to(input.device))
 
     def focal_loss(self, clas_pred: Tensor, clas_tgt: Tensor) -> Tensor:
         """
