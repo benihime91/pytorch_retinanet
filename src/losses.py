@@ -23,7 +23,7 @@ class RetinaNetLosses(nn.Module):
             n = torch.abs(input - target)
             cond = n < self.beta
             loss = torch.where(cond, 0.5 * n ** 2 / self.beta, n - 0.5 * self.beta)
-        return torch.tensor(loss.sum().to(input.device))
+        return loss.sum()
 
     def focal_loss(self, clas_pred: Tensor, clas_tgt: Tensor) -> Tensor:
         """
@@ -72,7 +72,7 @@ class RetinaNetLosses(nn.Module):
             )  # match the targets with anchors to get the bboxes
             bb_loss = self.smooth_l1_loss(bbox_pred, bbox_tgt)
         else:
-            bb_loss = 0.0
+            bb_loss = torch.tensor(0.0).to(bbox_pred.device)
 
         # filtering mask to filter `ignore` classes from the class predicitons
         matches.add_(1)
