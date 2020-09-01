@@ -1,4 +1,3 @@
-
 from typing import *
 
 import torch
@@ -10,12 +9,11 @@ from .utils.modelling import bbox_2_activ, matcher
 
 
 class RetinaNetLosses(nn.Module):
-    def __init__(self, num_classes) -> None:
+    def __init__(self, num_classes: int) -> None:
         super(RetinaNetLosses, self).__init__()
         self.n_c = num_classes
         self.alpha = FOCAL_LOSS_ALPHA
         self.gamma = FOCAL_LOSS_GAMMA
-        self.smooth_l1_loss_beta = SMOOTH_L1_LOSS_BETA
 
     def focal_loss(self, clas_pred: Tensor, clas_tgt: Tensor) -> Tensor:
         """
@@ -117,6 +115,7 @@ class RetinaNetLosses(nn.Module):
             losses["classification_loss"].append(classification_loss)
             losses["regression_loss"].append(regression_loss)
 
+        # Average of the losses
         losses["classification_loss"] = sum(losses["classification_loss"]) / len(
             losses["classification_loss"]
         )

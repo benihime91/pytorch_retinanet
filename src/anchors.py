@@ -3,8 +3,7 @@ import math
 from typing import *
 
 import torch
-from torch import Tensor, device, nn
-
+from torch import Tensor, nn
 from torchvision.models.detection.image_list import ImageList
 
 from .config import *
@@ -78,7 +77,8 @@ class AnchorGenerator(nn.Module):
         super(AnchorGenerator, self).__init__()
         # Anchors have areas of 32**2 to 512**2 on pyramid levels P3 to P7
         # at each pyramid level we use anchors at three aspect ratios {1:2; 1:1, 2:1}
-        # at each anchor level we add anchors of sizes {2**0, 2**(1/3), 2**(2/3)} of the original set of 3 anchors
+        # at each anchor level we add anchors of sizes {2**0, 2**(1/3), 2**(2/3)}
+        # of the original set of 3 anchors
         # In total there are A=9 anchors at each feature map for each pixel
         # Unpack parameters
         strides = ifnone(strides, ANCHOR_STRIDES)
@@ -93,8 +93,7 @@ class AnchorGenerator(nn.Module):
             aspect_ratios, self.num_features, "aspect_ratios"
         )
         self.offset = offset
-        self.cell_anchors = self._calculate_cell_anchors(
-            self.sizes, self.aspect_ratios)
+        self.cell_anchors = self._calculate_cell_anchors(self.sizes, self.aspect_ratios)
 
     def _calculate_cell_anchors(self, sizes, ratios):
         return self._calculate_anchors(sizes, ratios)
@@ -149,7 +148,9 @@ class AnchorGenerator(nn.Module):
         return [len(cell_anchors) for cell_anchors in self.cell_anchors]
 
     @staticmethod
-    def _compute_grid_offsets(size: List[int], stride: int, offset: float, device):
+    def _compute_grid_offsets(
+        size: List[int], stride: int, offset: float, device: torch.device
+    ):
         "Compute grid offsets of `size` with `stride`"
         H, W = size
 
@@ -167,7 +168,9 @@ class AnchorGenerator(nn.Module):
 
         return shifts_x, shifts_y
 
-    def grid_anchors(self, grid_sizes: List[List[int]], device) -> List[Tensor]:
+    def grid_anchors(
+        self, grid_sizes: List[List[int]], device: torch.device
+    ) -> List[Tensor]:
         """
         Returns : list[Tensor] : #feature_map tensors, each is (#locations x #cell_anchors) x 4
         """

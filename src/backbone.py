@@ -85,6 +85,7 @@ def get_backbone(
     if kind not in __all__:
         raise ValueError('f"`kind` must be one of {__all__} got {kind}"')
 
-    backbone = BackBone(kind=kind, hook_fn=hook_outputs,
-                        pretrained=pretrained, freeze_bn=freeze_bn)
+    backbone = BackBone(
+        kind=kind, hook_fn=hook_outputs, pretrained=pretrained, freeze_bn=freeze_bn
+    )
     return backbone
