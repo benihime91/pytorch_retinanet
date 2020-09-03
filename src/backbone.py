@@ -1,9 +1,9 @@
 # Modified from https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py
 # for this particular task.
-import torch
-from torch import Tensor
 from typing import *
-from torch import nn
+
+import torch
+from torch import Tensor, nn
 from torchvision.models.utils import load_state_dict_from_url
 
 __all__ = ["resnet18", "resnet34", "resnet50", "resnet101", "resnet152"]
@@ -68,20 +68,16 @@ class BasicBlock(nn.Module):
 
     def forward(self, x):
         identity = x
-
         out = self.conv1(x)
         out = self.bn1(out)
         out = self.relu(out)
-
         out = self.conv2(out)
         out = self.bn2(out)
-
         if self.downsample is not None:
             identity = self.downsample(x)
 
         out += identity
         out = self.relu(out)
-
         return out
 
 
@@ -126,11 +122,9 @@ class Bottleneck(nn.Module):
         out = self.conv1(x)
         out = self.bn1(out)
         out = self.relu(out)
-
         out = self.conv2(out)
         out = self.bn2(out)
         out = self.relu(out)
-
         out = self.conv3(out)
         out = self.bn3(out)
 
@@ -144,6 +138,8 @@ class Bottleneck(nn.Module):
 
 
 class ResNetBackbone(nn.Module):
+    "Resnet BackBone with only the feature extractor layers"
+
     def __init__(
         self,
         block,
@@ -189,8 +185,6 @@ class ResNetBackbone(nn.Module):
         self.layer4 = self._make_layer(
             block, 512, layers[3], stride=2, dilate=replace_stride_with_dilation[2]
         )
-        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Linear(512 * block.expansion, num_classes)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -256,7 +250,6 @@ class ResNetBackbone(nn.Module):
         x = self.bn1(x)
         x = self.relu(x)
         x = self.maxpool(x)
-
         x = self.layer1(x)
         x = self.layer2(x)
         x = self.layer3(x)
@@ -361,7 +354,6 @@ class BackBone(nn.Module):
         self.backbone.layer2.register_forward_hook(hook_fn)
         self.backbone.layer3.register_forward_hook(hook_fn)
         self.backbone.layer4.register_forward_hook(hook_fn)
-
         # Freeze batch_norm: Not sure why ?? but every other implementation does it
         if freeze_bn:
             for layer in self.modules():
