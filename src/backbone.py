@@ -2,7 +2,6 @@
 # for this particular task.
 from typing import *
 
-import torch
 from torch import Tensor, nn
 from torchvision.models.utils import load_state_dict_from_url
 
@@ -251,6 +250,7 @@ class ResNetBackbone(nn.Module):
         x = self.relu(x)
         x = self.maxpool(x)
         x = self.layer1(x)
+
         out2 = x = self.layer2(x)
         out3 = x = self.layer3(x)
         out4 = x = self.layer4(x)
@@ -328,14 +328,6 @@ def resnet152(pretrained=False, progress=True, **kwargs):
     )
 
 
-# # Dictionary to store Intermediate Outputs
-# inter_outs = {}
-
-
-# def hook_outputs(self, inp, out) -> None:
-#     inter_outs[self] = out
-
-
 loaders = {
     "resnet18": resnet18,
     "resnet34": resnet34,
@@ -354,11 +346,7 @@ class BackBone(nn.Module):
         build_fn = loaders[kind]
         self.backbone = build_fn(pretrained=pretrained)
 
-        # self.backbone.layer2.register_forward_hook(hook_fn)
-        # self.backbone.layer3.register_forward_hook(hook_fn)
-        # self.backbone.layer4.register_forward_hook(hook_fn)
-
-        ## Freeze batch_norm: Not sure why ?? but every other implementation does it
+        # Freeze batch_norm: Not sure why ?? but every other implementation does it
         if freeze_bn:
             for layer in self.modules():
                 if isinstance(layer, nn.BatchNorm2d):
@@ -367,9 +355,6 @@ class BackBone(nn.Module):
     def forward(self, xb: Tensor) -> List[Tensor]:
         output_dict = self.backbone(xb)
         out = [
-            # inter_outs[self.backbone.layer2],
-            # inter_outs[self.backbone.layer3],
-            # inter_outs[self.backbone.layer4],
             output_dict["layer_2"],
             output_dict["layer_3"],
             output_dict["layer_4"],
@@ -378,7 +363,7 @@ class BackBone(nn.Module):
 
 
 def get_backbone(
-    kind: str = "resnet18", pretrained: bool = True, freeze_bn: bool = True
+    kind: str = "resnet50", pretrained: bool = True, freeze_bn: bool = True
 ) -> nn.Module:
     """
     Returns a `ResNet` Backbone.
