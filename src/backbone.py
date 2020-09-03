@@ -251,10 +251,16 @@ class ResNetBackbone(nn.Module):
         x = self.relu(x)
         x = self.maxpool(x)
         x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
-        return x
+        out2 = x = self.layer2(x)
+        out3 = x = self.layer3(x)
+        out4 = x = self.layer4(x)
+
+        output_dict = {
+            "layer_2": out2,
+            "layer_3": out3,
+            "layer_4": out4,
+        }
+        return output_dict
 
     def forward(self, x):
         return self._forward_impl(x)
@@ -322,12 +328,12 @@ def resnet152(pretrained=False, progress=True, **kwargs):
     )
 
 
-# Dictionary to store Intermediate Outputs
-inter_outs = {}
+# # Dictionary to store Intermediate Outputs
+# inter_outs = {}
 
 
-def hook_outputs(self, inp, out) -> None:
-    inter_outs[self] = out
+# def hook_outputs(self, inp, out) -> None:
+#     inter_outs[self] = out
 
 
 loaders = {
@@ -341,31 +347,32 @@ loaders = {
 
 class BackBone(nn.Module):
     def __init__(
-        self,
-        kind: str = "resnet18",
-        hook_fn: Callable = None,
-        pretrained: bool = True,
-        freeze_bn: bool = True,
+        self, kind: str = "resnet18", pretrained: bool = True, freeze_bn: bool = True,
     ) -> None:
         """Create a Backbone from `kind`"""
         super(BackBone, self).__init__()
         build_fn = loaders[kind]
         self.backbone = build_fn(pretrained=pretrained)
-        self.backbone.layer2.register_forward_hook(hook_fn)
-        self.backbone.layer3.register_forward_hook(hook_fn)
-        self.backbone.layer4.register_forward_hook(hook_fn)
-        # Freeze batch_norm: Not sure why ?? but every other implementation does it
+
+        # self.backbone.layer2.register_forward_hook(hook_fn)
+        # self.backbone.layer3.register_forward_hook(hook_fn)
+        # self.backbone.layer4.register_forward_hook(hook_fn)
+
+        ## Freeze batch_norm: Not sure why ?? but every other implementation does it
         if freeze_bn:
             for layer in self.modules():
                 if isinstance(layer, nn.BatchNorm2d):
                     layer.eval()
 
     def forward(self, xb: Tensor) -> List[Tensor]:
-        _ = self.backbone(xb)
+        output_dict = self.backbone(xb)
         out = [
-            inter_outs[self.backbone.layer2],
-            inter_outs[self.backbone.layer3],
-            inter_outs[self.backbone.layer4],
+            # inter_outs[self.backbone.layer2],
+            # inter_outs[self.backbone.layer3],
+            # inter_outs[self.backbone.layer4],
+            output_dict["layer_2"],
+            output_dict["layer_3"],
+            output_dict["layer_4"],
         ]
         return out
 
@@ -387,7 +394,5 @@ def get_backbone(
     if kind not in __all__:
         raise ValueError('f"`kind` must be one of {__all__} got {kind}"')
 
-    backbone = BackBone(
-        kind=kind, hook_fn=hook_outputs, pretrained=pretrained, freeze_bn=freeze_bn
-    )
+    backbone = BackBone(kind=kind, pretrained=pretrained, freeze_bn=freeze_bn)
     return backbone
