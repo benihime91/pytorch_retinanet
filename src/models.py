@@ -177,13 +177,12 @@ class Retinanet(nn.Module):
 
         detections = torch.jit.annotate(List[Dict[str, Tensor]], [])
 
-        all_boxes = []
-        all_scores = []
-        all_labels = []
-
         for bb_per_im, sc_per_im, ancs_per_im, im_sz, lbl_per_im in zip(
             bboxes, scores, anchors, im_szs, labels
         ):
+            all_boxes = []
+            all_scores = []
+            all_labels = []
 
             bb_per_im = activ_2_bbox(bb_per_im, ancs_per_im)
             bb_per_im = ops.clip_boxes_to_image(bb_per_im, im_sz)
@@ -223,13 +222,14 @@ class Retinanet(nn.Module):
             all_scores.append(sc_per_im)
             all_labels.append(lbl_per_im)
 
-        detections.append(
-            {
-                "boxes": torch.cat(all_boxes, dim=0),
-                "scores": torch.cat(all_scores, dim=0),
-                "labels": torch.cat(all_labels, dim=0),
-            }
-        )
+            detections.append(
+                {
+                    "boxes": torch.cat(all_boxes, dim=0),
+                    "scores": torch.cat(all_scores, dim=0),
+                    "labels": torch.cat(all_labels, dim=0),
+                }
+            )
+
         return detections
 
         # for cls_idx in range(num_classes):
