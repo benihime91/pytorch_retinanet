@@ -129,7 +129,6 @@ class Retinanet(nn.Module):
         self.nms_thres = nms_thres
         self.detections_per_img = max_detections_per_images
         self.num_classes = num_classes
-        self.topk_candidates = TOPK_CANDIDATES_TEST
 
     def _get_backbone_ouputs(self) -> List:
         if self.backbone_kind in __small__:
