@@ -67,7 +67,9 @@ BBOX_REG_WEIGHTS = [1.0, 1.0, 1.0, 1.0]
 # considered for inference (to improve speed)
 SCORE_THRES: float = 0.05
 NMS_THRES: float = 0.5
-MAX_DETECTIONS_PER_IMAGE: int = 300
+# Maximum number of detections to return per image during inference (100 is
+# based on the limit established for the COCO dataset).
+MAX_DETECTIONS_PER_IMAGE: int = 100
 
 # IoU overlap ratio bg & fg for labeling anchors.
 # Anchors with < bg are labeled negative (0)
