@@ -1,5 +1,0 @@
-scheduler:
-  class_name: torch.optim.lr_scheduler.MultiStepLR
-  params:
-    milestones: [16, 22]
-    gamma: 0.1

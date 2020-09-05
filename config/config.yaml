@@ -1,4 +1,0 @@
-defaults:
-  - augmentation: transforms
-  - scheduler: multi_step
-  - optimizer: sgd

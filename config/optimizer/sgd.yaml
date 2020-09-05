@@ -1,6 +1,0 @@
-optimizer:
-  class_name: torch.optim.SGD
-  params:
-    lr: ${training.lr}
-    momentum: 0.9
-    weight_decay: 0.0005
