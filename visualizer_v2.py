@@ -6,7 +6,7 @@ import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
 
-from src.utils.general_utils import ifnone
+from .src.utils.general_utils import ifnone
 
 # Turn interactive plotting off
 plt.ioff()
