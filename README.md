@@ -1,5 +1,5 @@
 # pytorch_retinanet
-A simple implementations of `Retinanet` for `object detection` as described in the paper [Focal Loss for Dense Object Detection](https://arxiv.org/abs/1708.02002).
+A simple `PyTorch` implementation of `Retinanet` for object detection as described in the paper **[Focal Loss for Dense Object Detection](https://arxiv.org/abs/1708.02002).**
 
 ## TODO: 
 - [x] Create `Anchor Generator`.
