@@ -23,10 +23,8 @@ A simple implementations of `Retinanet` for `object detection` as described in t
 - Started Training on [The Oxford-IIIT Pet Dataset](https://www.robots.ox.ac.uk/~vgg/data/pets/) ran to many errors. 😭
 - Fixed the errors & was able to train on the [The Oxford-IIIT Pet Dataset](https://www.robots.ox.ac.uk/~vgg/data/pets/).
 - Check https://github.com/benihime91/retinanet_pet_detector.
-
-
 - 27 August 2020:
   - Started training on [Pascal VOC 2007](http://host.robots.ox.ac.uk/pascal/VOC/voc2007/index.html).
-  - Ran into errors mainly due to albumentations removing boxes.
+  - Ran into errors mainly due to `albumentations` removing boxes.
   - Fixed my image transformation pipeline.
-  - Using PyTorchLightning Trainer to automate my training process: it's just awesome. 😎 
+  - Using PyTorchLightning to automate my training process.
