@@ -17,7 +17,7 @@ A simple implementations of `Retinanet` for `object detection` as described in t
   - [x] Fix augmentation pipeline
   - [x] Log wandb & TensorBoard
   - [x] Evaluation using `COCO API`.
-- [ ] Train on COCO dataset. (Not sure if I have the resources)
+- [ ] Train on COCO dataset.
 
 ## Updates
 - Started Training on [The Oxford-IIIT Pet Dataset](https://www.robots.ox.ac.uk/~vgg/data/pets/) ran to many errors. 😭
