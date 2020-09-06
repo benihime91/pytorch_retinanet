@@ -1,6 +1,9 @@
-pytorch-lightning
-opencv-python
-git+https://github.com/albumentations-team/albumentations
-pycocotools
-matplotlib
-hydra-core
+torch==1.6.0
+torchvision==0.7.0
+pycocotools==2.0.1
+pytorch-lightning==0.9.0
+albumentations==0.4.6
+matplotlib==3.2.2
+numpy==1.18.5
+opencv-python==4.3.0.36
+streamlit==0.62.0
