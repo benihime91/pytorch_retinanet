@@ -170,74 +170,67 @@ class Retinanet(nn.Module):
         device = class_logits.device
         num_classes = class_logits.shape[-1]
 
-        # create labels for each score
-        labels = torch.arange(num_classes, device=device)
-        labels = labels.view(1, -1).expand_as(scores)
-
         detections = torch.jit.annotate(List[Dict[str, Tensor]], [])
 
-        for bb_per_im, sc_per_im, ancs_per_im, im_sz, lbl_per_im in zip(
-            bboxes, scores, anchors, im_szs, labels
-        ):
-            all_boxes = []
-            all_scores = []
-            all_labels = []
+        all_boxes = []
+        all_scores = []
+        all_labels = []
 
+        for bb_per_im, sc_per_im, ancs_per_im, im_sz in zip(bboxes, scores, anchors, im_szs):
+
+            # Convert the precicitons of the model into bounding boxes
             bb_per_im = activ_2_bbox(bb_per_im, ancs_per_im)
+            # clip boxes to the image size
             bb_per_im = ops.clip_boxes_to_image(bb_per_im, im_sz)
 
-            for cls_idx in range(num_classes):
-                # remove low scoring boxes and grab the predictions corresponding to the cls_idx
-                inds = torch.gt(sc_per_im[:, cls_idx], self.score_thres)
-                bb_per_cls, sc_per_cls, lbl_per_cls = (
-                    bb_per_im[inds],
-                    sc_per_im[inds, cls_idx],
-                    lbl_per_im[inds, cls_idx],
-                )
-                # remove empty boxes
-                keep = ops.remove_small_boxes(bb_per_cls, min_size=1e-2)
-                bb_per_cls, sc_per_cls, lbl_per_cls = (
-                    bb_per_cls[keep],
-                    sc_per_cls[keep],
-                    lbl_per_cls[keep],
-                )
-                # non-maximum suppression, independently done per class
-                keep = ops.nms(bb_per_cls, sc_per_cls, self.nms_thres)
-                # keep only topk scoring predictions
-                keep = keep[: self.detections_per_img]
-                bb_per_cls, sc_per_cls, lbl_per_cls = (
-                    bb_per_cls[keep],
-                    sc_per_cls[keep],
-                    lbl_per_cls[keep],
-                )
+            # Remove small boxes
+            keep = ops.remove_small_boxes(bb_per_im, min_size=1e-02)
+            bb_per_im = bb_per_im[keep]
+            sc_per_im = sc_per_im[keep]
 
-                all_boxes.append(bb_per_cls)
-                all_scores.append(sc_per_cls)
-                all_labels.append(lbl_per_cls)
+            # filter predictions by score threshold
+            detect_mask = sc_per_im.max(1)[0] > self.score_thres
+            sc_per_im, lbl_per_im = sc_per_im[detect_mask].max(1)
+            bb_per_im = bb_per_im[detect_mask]
 
-            detections.append(
-                {
-                    "boxes": torch.cat(all_boxes, dim=0),
-                    "scores": torch.cat(all_scores, dim=0),
-                    "labels": torch.cat(all_labels, dim=0),
-                }
+            # batch everything,
+            bb_per_im = bb_per_im.reshape(-1, 4)
+            sc_per_im = sc_per_im.reshape(-1)
+            lbl_per_im = lbl_per_im.reshape(-1)
+
+            # non-maximum suppression, independently done per class
+            keep = ops.batched_nms(bb_per_im, sc_per_im, lbl_per_im, self.nms_thres)
+            keep = keep[: self.detections_per_img]
+            # Filter predicitons
+            bb_per_im, sc_per_im, lbl_per_im = (
+                bb_per_im[keep],
+                sc_per_im[keep],
+                lbl_per_im[keep],
             )
 
-        return detections
+            all_boxes.append(bb_per_im)
+            all_scores.append(sc_per_im)
+            all_labels.append(lbl_per_im)
 
-    def _get_outputs(
-        self, losses, detections
-    ) -> Union[Dict[str, Tensor], List[Dict[str, Tensor]]]:
+        detections.append(
+            {
+                "boxes": torch.cat(all_boxes, dim=0),
+                "scores": torch.cat(all_scores, dim=0),
+                "labels": torch.cat(all_labels, dim=0),
+            }
+        )
+
+        return detections 
+
+    def _get_outputs(self, losses, detections) -> Union[Dict[str, Tensor], List[Dict[str, Tensor]]]:
         "if `training` return losses else return `detections`"
         if self.training:
             return losses
         else:
             return detections
 
-    def forward(
-        self, images: List[Tensor], targets: Optional[List[Dict[str, Tensor]]] = None
-    ) -> Union[Dict[str, Tensor], List[Dict[str, Tensor]]]:
-
+    def forward(self, images: List[Tensor], targets: Optional[List[Dict[str, Tensor]]] = None):
+        # returns Union[Dict[str, Tensor], List[Dict[str, Tensor]]]
         if self.training and targets is None:
             raise ValueError("In training Model, `targets` must be given")
 
@@ -248,6 +241,7 @@ class Retinanet(nn.Module):
             assert len(val) == 2
             orig_im_szs.append((val[0], val[1]))
 
+        # Forward pass thorugh the network
         images, targets = self.transform_inputs(images, targets)
         feature_maps = self.backbone(images.tensors)
         feature_maps = self.fpn(feature_maps)
@@ -267,5 +261,6 @@ class Retinanet(nn.Module):
                 detections = self.transform_inputs.postprocess(
                     detections, images.image_sizes, orig_im_szs
                 )
+        
         # Return Outputs
         return self._get_outputs(losses, detections)
