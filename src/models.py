@@ -204,8 +204,7 @@ class Retinanet(nn.Module):
                 )
                 # non-maximum suppression, independently done per class
                 keep = ops.nms(bb_per_cls, sc_per_cls, self.nms_thres)
-                # keep only topk scoring predictions
-                keep = keep[: self.detections_per_img]
+
                 bb_per_cls, sc_per_cls, lbl_per_cls = (
                     bb_per_cls[keep],
                     sc_per_cls[keep],
@@ -216,11 +215,25 @@ class Retinanet(nn.Module):
                 all_scores.append(sc_per_cls)
                 all_labels.append(lbl_per_cls)
 
+            # Convert to tensors
+            all_boxes = torch.cat(all_boxes, dim=0)
+            all_scores = torch.cat(all_scores, dim=0)
+            all_labels = torch.cat(all_labels, dim=0)
+            # Sort by scores
+            _, topk_idxs = all_scores.sort(descending=True)
+
+            topk_idxs = topk_idxs[:self.detections_per_img]
+            all_boxes, all_scores, all_labels = (
+                all_boxes[topk_idxs],
+                all_scores[topk_idxs],
+                all_labels[topk_idxs]
+            )
+
             detections.append(
                 {
-                    "boxes":  torch.cat(all_boxes, dim=0),
-                    "scores": torch.cat(all_scores, dim=0),
-                    "labels": torch.cat(all_labels, dim=0),
+                    "boxes":  all_boxes,
+                    "scores": all_scores,
+                    "labels": all_labels,
                 }
             )
 
