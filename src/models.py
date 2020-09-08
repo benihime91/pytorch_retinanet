@@ -3,6 +3,7 @@ from typing import *
 import torch
 import torch.nn as nn
 from torch import Tensor
+
 from torchvision.models.detection.transform import GeneralizedRCNNTransform
 from torchvision.ops import boxes as ops
 
@@ -161,23 +162,22 @@ class Retinanet(nn.Module):
         anchors: List[Tensor],
         im_szs: List[Tuple[int, int]],
     ) -> Tuple[List[Tensor], List[Tensor], List[Tensor]]:
-        " Process `outputs` and return the predicted bboxes, score, clas_labels above `detect_thres` "
+        " Process `outputs` and return the predicted bboxes, score, clas_labels above `score_thres` "
 
-        class_logits = outputs.pop("cls_preds")
+        clas_preds = outputs.pop("cls_preds")
         bboxes = outputs.pop("bbox_preds")
-        scores = torch.sigmoid(class_logits)
+        # sigmoid the predicted probabilities
+        scores = torch.sigmoid(clas_preds)
 
-        device = class_logits.device
-        num_classes = class_logits.shape[-1]
-
+        # Dictionary to store final detections
         detections = torch.jit.annotate(List[Dict[str, Tensor]], [])
 
+        # Dictionary to store final outputs
         all_boxes = []
         all_scores = []
         all_labels = []
 
         for bb_per_im, sc_per_im, ancs_per_im, im_sz in zip(bboxes, scores, anchors, im_szs):
-
             # Convert the precicitons of the model into bounding boxes
             bb_per_im = activ_2_bbox(bb_per_im, ancs_per_im)
             # clip boxes to the image size
@@ -185,42 +185,53 @@ class Retinanet(nn.Module):
 
             # Remove small boxes
             keep = ops.remove_small_boxes(bb_per_im, min_size=1e-02)
-            bb_per_im = bb_per_im[keep]
-            sc_per_im = sc_per_im[keep]
+            bb_per_im, sc_per_im = bb_per_im[keep], sc_per_im[keep]
 
-            # filter predictions by score threshold
-            detect_mask = sc_per_im.max(1)[0] > self.score_thres
-            sc_per_im, lbl_per_im = sc_per_im[detect_mask].max(1)
-            bb_per_im = bb_per_im[detect_mask]
+            # sort the predicted probabilits and their all_labels
+            # Grab the predicted class probabilities and their idxs (labels)
+            predicted_prob, topk_idxs = sc_per_im.sort(descending=True)
+
+            # filter out the proposals with low confidence score
+            keep_idxs = predicted_prob > self.score_thres
+            # predicted probabilites
+            predicted_prob = predicted_prob[keep_idxs]
+            topk_idxs = topk_idxs[keep_idxs]  # [predicted classes]
+
+            bb_idxs = topk_idxs // self.num_classes  # box idxs to keep
+            predicted_classes = topk_idxs % self.num_classes  # classes to keep
+
+            predicted_boxes = bb_per_im[bb_idxs]  # filter boxes
 
             # batch everything,
-            bb_per_im = bb_per_im.reshape(-1, 4)
-            sc_per_im = sc_per_im.reshape(-1)
-            lbl_per_im = lbl_per_im.reshape(-1)
+            predicted_boxes = predicted_boxes.reshape(-1, 4)
+            predicted_prob = predicted_prob.reshape(-1)
+            predicted_classes = predicted_classes.reshape(-1)
 
             # non-maximum suppression, independently done per class
-            keep = ops.batched_nms(bb_per_im, sc_per_im, lbl_per_im, self.nms_thres)
+            keep = ops.batched_nms(
+                predicted_boxes, predicted_prob, predicted_classes, self.nms_thres)
+
             keep = keep[: self.detections_per_img]
             # Filter predicitons
-            bb_per_im, sc_per_im, lbl_per_im = (
-                bb_per_im[keep],
-                sc_per_im[keep],
-                lbl_per_im[keep],
+            predicted_boxes, predicted_prob, predicted_classes = (
+                predicted_boxes[keep],
+                predicted_prob[keep],
+                predicted_classes[keep],
             )
 
-            all_boxes.append(bb_per_im)
-            all_scores.append(sc_per_im)
-            all_labels.append(lbl_per_im)
+            all_boxes.append(predicted_boxes)
+            all_scores.append(predicted_prob)
+            all_labels.append(predicted_classes)
 
         detections.append(
             {
-                "boxes": torch.cat(all_boxes, dim=0),
+                "boxes": torch.cat(all_boxes,  dim=0),
                 "scores": torch.cat(all_scores, dim=0),
                 "labels": torch.cat(all_labels, dim=0),
             }
         )
 
-        return detections 
+        return detections
 
     def _get_outputs(self, losses, detections) -> Union[Dict[str, Tensor], List[Dict[str, Tensor]]]:
         "if `training` return losses else return `detections`"
@@ -261,6 +272,6 @@ class Retinanet(nn.Module):
                 detections = self.transform_inputs.postprocess(
                     detections, images.image_sizes, orig_im_szs
                 )
-        
+
         # Return Outputs
         return self._get_outputs(losses, detections)
