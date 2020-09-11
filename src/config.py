@@ -13,9 +13,9 @@ MEAN: List[float] = [0.485, 0.456, 0.406]
 # `STD values` used for input normalization.
 STD: List[float] = [0.229, 0.224, 0.225]
 # Size of the smallest side of the image during training
-MIN_IMAGE_SIZE: int = 600
+MIN_IMAGE_SIZE: int = 800
 # Maximum size of the side of the image during training
-MAX_IMAGE_SIZE: int = 600
+MAX_IMAGE_SIZE: int = 1333
 
 
 # ----------------------------------------------------------------------------- #
@@ -58,6 +58,7 @@ PRETRAINED_BACKBONE: bool = True
 PRIOR: float = 0.01
 
 # Wether to freeze `BatchNormalization` layers of `backbone`
+# If batch size is small set this to True
 FREEZE_BN: bool = True
 
 # Weights on (dx, dy, dw, dh) for normalizing Retinanet anchor regression targets
