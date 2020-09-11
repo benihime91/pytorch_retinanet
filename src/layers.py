@@ -19,17 +19,22 @@ class FeaturePyramid(nn.Module):
         super(FeaturePyramid, self).__init__()
         # `conv layers` to calculate `p3`
         self.conv_c3_1x1 = nn.Conv2d(C_3_size, out_channels, 1, 1, padding=0)
-        self.conv_c3_3x3 = nn.Conv2d(out_channels, out_channels, 3, 1, padding=1)
+        self.conv_c3_3x3 = nn.Conv2d(
+            out_channels, out_channels, 3, 1, padding=1)
         # `conv layers` to calculate `p4`
         self.conv_c4_1x1 = nn.Conv2d(C_4_size, out_channels, 1, 1, padding=0)
-        self.conv_c4_3x3 = nn.Conv2d(out_channels, out_channels, 3, 1, padding=1)
+        self.conv_c4_3x3 = nn.Conv2d(
+            out_channels, out_channels, 3, 1, padding=1)
         # `conv layers` to calculate `p5`
         self.conv_c5_1x1 = nn.Conv2d(C_5_size, out_channels, 1, 1, padding=0)
-        self.conv_c5_3x3 = nn.Conv2d(out_channels, out_channels, 3, 1, padding=1)
+        self.conv_c5_3x3 = nn.Conv2d(
+            out_channels, out_channels, 3, 1, padding=1)
         # `conv layers` to calculate `p6`
-        self.conv_c6_3x3 = nn.Conv2d(C_5_size, out_channels, 3, stride=2, padding=1)
+        self.conv_c6_3x3 = nn.Conv2d(
+            C_5_size, out_channels, 3, stride=2, padding=1)
         # `conv layers` to calculate `p7`
-        self.conv_c7_3x3 = nn.Conv2d(out_channels, out_channels, 3, stride=2, padding=1)
+        self.conv_c7_3x3 = nn.Conv2d(
+            out_channels, out_channels, 3, stride=2, padding=1)
 
         # `upsample layer` to increase `output_size` for `elementwise-additions`
         # with previous pyramid level
@@ -67,6 +72,8 @@ class FeaturePyramid(nn.Module):
 class RetinaNetHead(nn.Module):
     """
     A regression & classification head for use in `RetinaNet`
+    The head used in RetinaNet for object classification and box regression.
+    It has two subnets for the two tasks, with a common structure but separate parameters.
 
     Arguments :
     ---------
@@ -159,13 +166,19 @@ class RetinaNetClassSubnet(nn.Module):
             nn.ReLU(inplace=True),
         )
         self.class_subnet_output = nn.Conv2d(
-            out_channels, num_anchors * num_classes, 3, stride=1, padding=1
-        )
-        # Initialize the Final Layer as given in :paper: `RetinaNet`
+            out_channels, num_anchors * num_classes, 3, stride=1, padding=1)
+
+        # initialization
+        for modules in [self.class_subnet, self.class_subnet_output]:
+            for layer in modules.modules():
+                if isinstance(layer, nn.Conv2d):
+                    torch.nn.init.normal_(layer.weight, mean=0, std=0.01)
+                    torch.nn.init.constant_(layer.bias, 0)
+
+        # Use prior in model initialization to improve stability
         torch.nn.init.normal_(self.class_subnet_output.weight, std=0.01)
         torch.nn.init.constant_(
-            self.class_subnet_output.bias, -math.log((1 - prior) / prior)
-        )
+            self.class_subnet_output.bias, -math.log((1 - prior) / prior))
 
     def forward(self, feature_maps):
         cls_preds = []
@@ -178,7 +191,8 @@ class RetinaNetClassSubnet(nn.Module):
             # out: [num_batches, (num_anchors * num_classes), height, width ]
             N, _, H, W = x.shape
             x = x.view(N, -1, self.num_classes, H, W)
-            x = x.permute(0, 3, 4, 1, 2).contiguous().view(N, -1, self.num_classes)
+            x = x.permute(0, 3, 4, 1, 2).contiguous().view(
+                N, -1, self.num_classes)
             # out: [num_batches, (height*width*num_anchors), num_classes]
             cls_preds.append(x)
         # Concatenate along (height*wdth*num_anchors) dimension
@@ -221,17 +235,16 @@ class RetinaNetBoxSubnet(nn.Module):
             nn.Conv2d(out_channels, out_channels, 3, padding=1, stride=1),
             nn.ReLU(inplace=True),
         )
-        self.box_subnet_output = nn.Conv2d(
-            out_channels, num_anchors * 4, 3, padding=1, stride=1
-        )
 
-        # Initialize the Final Layer as given in :paper: `RetinaNet`
-        torch.nn.init.normal_(self.box_subnet_output.weight, std=0.01)
-        torch.nn.init.zeros_(self.box_subnet_output.bias)
-        for layer in self.box_subnet.children():
-            if isinstance(layer, nn.Conv2d):
-                torch.nn.init.normal_(layer.weight, std=0.01)
-                torch.nn.init.zeros_(layer.bias)
+        self.box_subnet_output = nn.Conv2d(
+            out_channels, num_anchors * 4, 3, padding=1, stride=1)
+
+        # initialization
+        for modules in [self.box_subnet, self.box_subnet_output]:
+            for layer in modules.modules():
+                if isinstance(layer, nn.Conv2d):
+                    torch.nn.init.normal_(layer.weight, mean=0, std=0.01)
+                    torch.nn.init.constant_(layer.bias, 0)
 
     def forward(self, feature_maps):
         bbox_preds = []
