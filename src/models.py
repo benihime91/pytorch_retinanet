@@ -3,7 +3,6 @@ from typing import *
 import torch
 import torch.nn as nn
 from torch import Tensor
-
 from torchvision.models.detection.transform import GeneralizedRCNNTransform
 from torchvision.ops import boxes as ops
 

@@ -22,7 +22,8 @@ class RetinaNetLosses(nn.Module):
         else:
             n = torch.abs(input - target)
             cond = n < self.beta
-            loss = torch.where(cond, 0.5 * n ** 2 / self.beta, n - 0.5 * self.beta)
+            loss = torch.where(cond, 0.5 * n ** 2 /
+                               self.beta, n - 0.5 * self.beta)
         return loss.sum()
 
     def focal_loss(self, clas_pred: Tensor, clas_tgt: Tensor) -> Tensor:
@@ -98,7 +99,8 @@ class RetinaNetLosses(nn.Module):
 
         # Normalize Loss with num foregrounds
         return (
-            bb_loss.to(clas_loss.dtype) / torch.clamp(bbox_mask.sum(), min=1.0),
+            bb_loss.to(clas_loss.dtype) /
+            torch.clamp(bbox_mask.sum(), min=1.0),
             clas_loss / torch.clamp(bbox_mask.sum(), min=1.0),
         )
 

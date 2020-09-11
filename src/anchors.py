@@ -80,6 +80,7 @@ class AnchorGenerator(nn.Module):
         # at each anchor level we add anchors of sizes {2**0, 2**(1/3), 2**(2/3)}
         # of the original set of 3 anchors
         # In total there are A=9 anchors at each feature map for each pixel
+
         # Unpack parameters
         strides = ifnone(strides, ANCHOR_STRIDES)
         sizes = ifnone(sizes, ANCHOR_SIZES)
@@ -93,7 +94,8 @@ class AnchorGenerator(nn.Module):
             aspect_ratios, self.num_features, "aspect_ratios"
         )
         self.offset = offset
-        self.cell_anchors = self._calculate_cell_anchors(self.sizes, self.aspect_ratios)
+        self.cell_anchors = self._calculate_cell_anchors(
+            self.sizes, self.aspect_ratios)
 
     def _calculate_cell_anchors(self, sizes, ratios):
         return self._calculate_anchors(sizes, ratios)
@@ -176,7 +178,9 @@ class AnchorGenerator(nn.Module):
         """
         # List to store anchors generated for given feature maps
         anchors = []
-        buffers: List[torch.Tensor] = [x[1] for x in self.cell_anchors.named_buffers()]
+        buffers: List[torch.Tensor] = [
+            x[1] for x in self.cell_anchors.named_buffers()
+        ]
 
         # Generate `anchors` over single feature map.
         for size, stride, base_anchors in zip(grid_sizes, self.strides, buffers):
@@ -184,6 +188,7 @@ class AnchorGenerator(nn.Module):
             shift_x, shift_y = self._compute_grid_offsets(
                 size, stride, offset=self.offset, device=device
             )
+
             shifts = torch.stack((shift_x, shift_y, shift_x, shift_y), dim=1)
             # shift base anchors to get the set of anchors for a full feature map
             anchors.append(
@@ -204,7 +209,7 @@ class AnchorGenerator(nn.Module):
                                       This works by padding the images to the same size,
                                       and storing in a field the original sizes of each image.
 
-          1. features (list[Tensor]): list of backbone feature maps on which to generate anchors.
+          1. features (list[Tensor]): list of feature maps on which to generate anchors.
 
         Returns:
           list[Tensor]: a list of Tensors of len `num_images` containing all the anchors for
