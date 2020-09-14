@@ -221,19 +221,15 @@ class Retinanet(nn.Module):
             # Sort by scores
             _, topk_idxs = all_scores.sort(descending=True)
 
-            topk_idxs = topk_idxs[:self.detections_per_img]
+            topk_idxs = topk_idxs[: self.detections_per_img]
             all_boxes, all_scores, all_labels = (
                 all_boxes[topk_idxs],
                 all_scores[topk_idxs],
-                all_labels[topk_idxs]
+                all_labels[topk_idxs],
             )
 
             detections.append(
-                {
-                    "boxes":  all_boxes,
-                    "scores": all_scores,
-                    "labels": all_labels,
-                }
+                {"boxes": all_boxes, "scores": all_scores, "labels": all_labels,}
             )
 
         return detections

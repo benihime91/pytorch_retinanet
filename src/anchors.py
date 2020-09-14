@@ -94,8 +94,7 @@ class AnchorGenerator(nn.Module):
             aspect_ratios, self.num_features, "aspect_ratios"
         )
         self.offset = offset
-        self.cell_anchors = self._calculate_cell_anchors(
-            self.sizes, self.aspect_ratios)
+        self.cell_anchors = self._calculate_cell_anchors(self.sizes, self.aspect_ratios)
 
     def _calculate_cell_anchors(self, sizes, ratios):
         return self._calculate_anchors(sizes, ratios)
@@ -178,9 +177,7 @@ class AnchorGenerator(nn.Module):
         """
         # List to store anchors generated for given feature maps
         anchors = []
-        buffers: List[torch.Tensor] = [
-            x[1] for x in self.cell_anchors.named_buffers()
-        ]
+        buffers: List[torch.Tensor] = [x[1] for x in self.cell_anchors.named_buffers()]
 
         # Generate `anchors` over single feature map.
         for size, stride, base_anchors in zip(grid_sizes, self.strides, buffers):
