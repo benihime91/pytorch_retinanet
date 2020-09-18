@@ -262,6 +262,7 @@ class Retinanet(nn.Module):
         # Generate anchors for the images
         anchors         = self.anchor_generator(images, feature_maps)
 
+        # Structures to store losses and outputs
         losses = {}
         detections = torch.jit.annotate(List[Dict[str, Tensor]], [])
 

@@ -8,14 +8,14 @@ from .config import *
 from .utilities import *
 
 
-def convert_tlbr_2_cthw(boxes: Tensor) -> Tensor:
+def convert_xywh(boxes: Tensor) -> Tensor:
     "Convert top/left bottom/right format `boxes` to center/size corners."
     center = (boxes[:, :2] + boxes[:, 2:]) / 2
     sizes = boxes[:, 2:] - boxes[:, :2]
     return torch.cat([center, sizes], 1)
 
 
-def convert_cthw_2_tlbr(boxes: Tensor) -> Tensor:
+def convert_x1y1x2y2(boxes: Tensor) -> Tensor:
     "Convert center/size format `boxes` to top/left bottom/right corners."
     top_left = boxes[:, :2] - boxes[:, 2:] / 2
     bot_right = boxes[:, :2] + boxes[:, 2:] / 2
@@ -26,15 +26,11 @@ def bbox_2_activ(bboxes: Tensor, anchors: Tensor) -> Tensor:
     "Return the target of the model on `anchors` for the `bboxes`."
     # Anchors & bboxes are of the forms : XYXY
     # Convert anchors and bboxes to XYWH format
-    bboxes, anchors = convert_tlbr_2_cthw(bboxes), convert_tlbr_2_cthw(anchors)
-
+    bboxes, anchors = convert_xywh(bboxes), convert_xywh(anchors)
+    # extrapolate bboxes over the anchors
     t_centers = (bboxes[..., :2] - anchors[..., :2]) / anchors[..., 2:]
-
     t_sizes = torch.log(bboxes[..., 2:] / anchors[..., 2:] + 1e-8)
-
-    deltas = torch.cat([t_centers, t_sizes], -1).mul_(
-        bboxes.new_tensor([BBOX_REG_WEIGHTS])
-    )
+    deltas = torch.cat([t_centers, t_sizes], -1).mul_(bboxes.new_tensor([BBOX_REG_WEIGHTS]))
     return deltas
 
 
@@ -42,14 +38,14 @@ def activ_2_bbox(activations: Tensor, anchors: Tensor) -> Tensor:
     "Converts the `activations` of the `model` to bounding boxes."
     # Anchors are of the form: XYXY & activations are of the form XYWH
     # Convert anchors to XYWH
-    anchors = convert_tlbr_2_cthw(anchors)
-
+    anchors = convert_xywh(anchors)
+    # Normalize retinanet output activations
     activations.div_(activations.new_tensor([BBOX_REG_WEIGHTS]))
-
+    # extrapolate the activations over the anchors
     centers = anchors[..., 2:] * activations[..., :2] + anchors[..., :2]
     sizes = anchors[..., 2:] * torch.exp(activations[..., :2])
-
-    return convert_cthw_2_tlbr(torch.cat([centers, sizes], -1))
+    # change format to XYXY
+    return convert_x1y1x2y2(torch.cat([centers, sizes], -1))
 
 
 def matcher(
