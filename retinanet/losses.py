@@ -41,7 +41,9 @@ class RetinaNetLosses(nn.Module):
         weights = clas_tgt * (1 - ps) + (1 - clas_tgt) * ps
         alphas = (1 - clas_tgt) * self.alpha + clas_tgt * (1 - self.alpha)
         weights.pow_(self.gamma).mul_(alphas)
-        clas_loss = F.binary_cross_entropy_with_logits(clas_pred, clas_tgt, weights, reduction="sum")
+        clas_loss = F.binary_cross_entropy_with_logits(
+            clas_pred, clas_tgt, weights, reduction="sum"
+        )
         return clas_loss
 
     def calc_loss(
@@ -84,7 +86,7 @@ class RetinaNetLosses(nn.Module):
         clas_tgt = clas_tgt[matches[clas_mask]]
         # no loss for the first(background) class
         clas_tgt = F.one_hot(clas_tgt, num_classes=self.n_c + 1)[:, 1:]
-        clas_tgt.to(clas_pred.dtype)
+        clas_tgt = clas_tgt.to(clas_pred.dtype)
         # classification loss
         clas_loss = self.focal_loss(clas_pred, clas_tgt)
 
