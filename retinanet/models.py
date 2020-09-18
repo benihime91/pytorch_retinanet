@@ -1,4 +1,5 @@
 import logging
+from logging import Logger
 from typing import *
 
 import torch
@@ -16,8 +17,6 @@ from .utilities import ifnone
 
 __small__ = ["resnet18", "resnet34"]
 __big__ = ["resnet50", "resnet101", "resnet101", "resnet152"]
-
-logger = logging.getLogger(__name__)
 
 
 class Retinanet(nn.Module):
@@ -86,6 +85,7 @@ class Retinanet(nn.Module):
         image_mean: Optional[List[float]] = None,
         image_std: Optional[List[float]] = None,
         anchor_generator: Optional[AnchorGenerator] = None,
+        logger=None,
     ) -> None:
 
         super(Retinanet, self).__init__()
@@ -114,7 +114,9 @@ class Retinanet(nn.Module):
 
         # Modules for RetinaNet
         self.backbone_kind = backbone_kind
-        self.transform = GeneralizedRCNNTransform(min_size, max_size, image_mean, image_std)
+        self.transform = GeneralizedRCNNTransform(
+            min_size, max_size, image_mean, image_std
+        )
         self.backbone = get_backbone(backbone_kind, pretrained, freeze_bn=freeze_bn)
         fpn_szs = self._get_backbone_ouputs()
         self.fpn = FeaturePyramid(fpn_szs[0], fpn_szs[1], fpn_szs[2], 256)
@@ -128,6 +130,7 @@ class Retinanet(nn.Module):
         self.detections_per_img = max_detections_per_images
         self.num_classes = num_classes
 
+        logger = ifnone(logger, logging.getLogger(__name__))
         logging.info(f"Backbone : {backbone_kind}")
         logging.info(f"Score Threshold : {self.score_thres}")
         logging.info(f"NMS Threshold : {self.nms_thres}")
