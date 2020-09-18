@@ -128,10 +128,10 @@ class Retinanet(nn.Module):
         self.detections_per_img = max_detections_per_images
         self.num_classes = num_classes
 
-        logging.info(f"Backbone:{backbone_kind}")
-        logging.info(f"Score Threshold:{self.score_thres}")
-        logging.info(f"NMS Threshold:{self.nms_thres}")
-        logging.info(f"Num Classes:{self.num_classes}")
+        logging.info(f"Backbone : {backbone_kind}")
+        logging.info(f"Score Threshold : {self.score_thres}")
+        logging.info(f"NMS Threshold : {self.nms_thres}")
+        logging.info(f"Num Classes : {self.num_classes}")
 
     def _get_backbone_ouputs(self) -> List:
         if self.backbone_kind in __small__:
