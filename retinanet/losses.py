@@ -41,9 +41,7 @@ class RetinaNetLosses(nn.Module):
         weights = clas_tgt * (1 - ps) + (1 - clas_tgt) * ps
         alphas = (1 - clas_tgt) * self.alpha + clas_tgt * (1 - self.alpha)
         weights.pow_(self.gamma).mul_(alphas)
-        clas_loss = F.binary_cross_entropy_with_logits(
-            clas_pred, clas_tgt, weights, reduction="sum"
-        )
+        clas_loss = F.binary_cross_entropy_with_logits(clas_pred, clas_tgt, weights, reduction="sum")
         return clas_loss
 
     def calc_loss(
@@ -59,7 +57,6 @@ class RetinaNetLosses(nn.Module):
         """
         # Match boxes with anchors to get `background`, `ignore` and `foreground` positions
         matches = matcher(anchors, bbox_tgt)
-
         # create filtering mask to filter `background` and `ignore` classes from the bboxes
         # This is also number of foreground
         bbox_mask = matches >= 0
@@ -67,9 +64,8 @@ class RetinaNetLosses(nn.Module):
         if bbox_mask.sum() != 0:
             bbox_pred = bbox_pred[bbox_mask]
             bbox_tgt = bbox_tgt[matches[bbox_mask]]
-            bbox_tgt = bbox_2_activ(
-                bbox_tgt, anchors[bbox_mask]
-            )  # match the targets with anchors to get the bboxes
+            # match the targets with anchors to get the bboxes
+            bbox_tgt = bbox_2_activ(bbox_tgt, anchors[bbox_mask])
             bb_loss = self.smooth_l1_loss(bbox_pred, bbox_tgt)
         else:
             bb_loss = torch.tensor(0.0).to(bbox_pred.device)
@@ -81,26 +77,22 @@ class RetinaNetLosses(nn.Module):
 
         # clas_tgt : [0, num_classes) -> [1, num_classes]
         clas_tgt = clas_tgt + 1
-
         # Add background class to account for background in `matches`.
         # When there are no matches
         # bg class is predicted when none of the others go out.
         clas_tgt = torch.cat([clas_tgt.new_zeros(1).long(), clas_tgt])
         clas_tgt = clas_tgt[matches[clas_mask]]
-
         # no loss for the first(background) class
-        clas_tgt = F.one_hot(clas_tgt, num_classes=self.n_c + 1)[:, 1:].to(
-            clas_pred.dtype
-        )
-
+        clas_tgt = F.one_hot(clas_tgt, num_classes=self.n_c + 1)[:, 1:]
+        clas_tgt.to(clas_pred.dtype)
         # classification loss
         clas_loss = self.focal_loss(clas_pred, clas_tgt)
 
         # Normalize Loss with num foregrounds
-        return (
-            bb_loss.to(clas_loss.dtype) / torch.clamp(bbox_mask.sum(), min=1.0),
-            clas_loss / torch.clamp(bbox_mask.sum(), min=1.0),
-        )
+        bb_loss.to(clas_loss.dtype).div_(torch.clamp(bbox_mask.sum(), min=1.0))
+        clas_loss.div_(torch.clamp(bbox_mask.sum(), min=1.0))
+
+        return bb_loss, clas_loss
 
     def forward(
         self,
