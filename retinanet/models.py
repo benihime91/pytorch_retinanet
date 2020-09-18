@@ -19,6 +19,7 @@ __big__ = ["resnet50", "resnet101", "resnet101", "resnet152"]
 
 logger = logging.getLogger(__name__)
 
+
 class Retinanet(nn.Module):
     """
     Implement RetinaNet in :paper:`RetinaNet`.
@@ -90,19 +91,21 @@ class Retinanet(nn.Module):
         super(Retinanet, self).__init__()
 
         # Set Parameters
-        num_classes               = ifnone(num_classes, NUM_CLASSES)
-        backbone_kind             = ifnone(backbone_kind, BACKBONE)
-        prior                     = ifnone(prior, PRIOR)
-        pretrained                = ifnone(pretrained, PRETRAINED_BACKBONE)
-        nms_thres                 = ifnone(nms_thres, NMS_THRES)
-        score_thres               = ifnone(score_thres, SCORE_THRES)
-        max_detections_per_images = ifnone(max_detections_per_images, MAX_DETECTIONS_PER_IMAGE)
-        freeze_bn                 = ifnone(freeze_bn, FREEZE_BN)
-        min_size                  = ifnone(min_size, MIN_IMAGE_SIZE)
-        max_size                  = ifnone(max_size, MAX_IMAGE_SIZE)
-        image_mean                = ifnone(image_mean, MEAN)
-        image_std                 = ifnone(image_std, STD)
-        anchor_generator          = ifnone(anchor_generator, AnchorGenerator())
+        num_classes = ifnone(num_classes, NUM_CLASSES)
+        backbone_kind = ifnone(backbone_kind, BACKBONE)
+        prior = ifnone(prior, PRIOR)
+        pretrained = ifnone(pretrained, PRETRAINED_BACKBONE)
+        nms_thres = ifnone(nms_thres, NMS_THRES)
+        score_thres = ifnone(score_thres, SCORE_THRES)
+        max_detections_per_images = ifnone(
+            max_detections_per_images, MAX_DETECTIONS_PER_IMAGE
+        )
+        freeze_bn = ifnone(freeze_bn, FREEZE_BN)
+        min_size = ifnone(min_size, MIN_IMAGE_SIZE)
+        max_size = ifnone(max_size, MAX_IMAGE_SIZE)
+        image_mean = ifnone(image_mean, MEAN)
+        image_std = ifnone(image_std, STD)
+        anchor_generator = ifnone(anchor_generator, AnchorGenerator())
 
         if backbone_kind not in __small__ + __big__:
             raise ValueError(
@@ -110,14 +113,15 @@ class Retinanet(nn.Module):
             )
 
         # Modules for RetinaNet
+        self.backbone_kind = backbone_kind
         self.transform = GeneralizedRCNNTransform(min_size, max_size, image_mean, image_std)
         self.backbone = get_backbone(backbone_kind, pretrained, freeze_bn=freeze_bn)
         fpn_szs = self._get_backbone_ouputs()
-        self.fpn = FeaturePyramid(fpn_szs[0], fpn_szs[1], fpn_szs[2], 256) 
+        self.fpn = FeaturePyramid(fpn_szs[0], fpn_szs[1], fpn_szs[2], 256)
         self.anchor_generator = anchor_generator
         num_anchors = self.anchor_generator.num_cell_anchors[0]
         self.retinanet_head = RetinaNetHead(256, 256, num_anchors, num_classes, prior)
-        
+
         # Parameters for detection
         self.score_thres = score_thres
         self.nms_thres = nms_thres
@@ -233,7 +237,9 @@ class Retinanet(nn.Module):
 
         return detections
 
-    def _get_outputs(self, losses, detections) -> Union[Dict[str, Tensor], List[Dict[str, Tensor]]]:
+    def _get_outputs(
+        self, losses, detections
+    ) -> Union[Dict[str, Tensor], List[Dict[str, Tensor]]]:
         "if `training` return losses else return `detections`"
         if self.training:
             return losses
@@ -256,11 +262,11 @@ class Retinanet(nn.Module):
 
         # Foward pass of the Model
         images, targets = self.transform(images, targets)
-        feature_maps    = self.backbone(images.tensors)
-        feature_maps    = self.fpn(feature_maps)
-        outputs         = self.retinanet_head(feature_maps)
+        feature_maps = self.backbone(images.tensors)
+        feature_maps = self.fpn(feature_maps)
+        outputs = self.retinanet_head(feature_maps)
         # Generate anchors for the images
-        anchors         = self.anchor_generator(images, feature_maps)
+        anchors = self.anchor_generator(images, feature_maps)
 
         # Structures to store losses and outputs
         losses = {}
@@ -270,6 +276,8 @@ class Retinanet(nn.Module):
             losses = self.compute_loss(targets, outputs, anchors)
         else:
             detections = self.process_detections(outputs, anchors, images.image_sizes)
-            detections = self.transform.postprocess(detections, images.image_sizes, orig_im_szs)
+            detections = self.transform.postprocess(
+                detections, images.image_sizes, orig_im_szs
+            )
         # Return Outputs
         return self._get_outputs(losses, detections)
