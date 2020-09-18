@@ -7,7 +7,7 @@ from torch import Tensor, nn
 from torchvision.models.detection.image_list import ImageList
 
 from .config import *
-from .utils.general_utils import ifnone
+from .utilities import ifnone
 
 
 class BufferList(nn.Module):

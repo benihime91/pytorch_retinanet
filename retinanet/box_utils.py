@@ -2,11 +2,10 @@ from typing import *
 
 import torch
 from torch import Tensor
-
 from torchvision.ops.boxes import box_iou
 
-from ...config import *
-from ..general_utils.utilities import *
+from .config import *
+from .utilities import *
 
 
 def convert_tlbr_2_cthw(boxes: Tensor) -> Tensor:
@@ -20,14 +19,13 @@ def convert_cthw_2_tlbr(boxes: Tensor) -> Tensor:
     "Convert center/size format `boxes` to top/left bottom/right corners."
     top_left = boxes[:, :2] - boxes[:, 2:] / 2
     bot_right = boxes[:, :2] + boxes[:, 2:] / 2
-
     return torch.cat([top_left, bot_right], 1)
 
 
 def bbox_2_activ(bboxes: Tensor, anchors: Tensor) -> Tensor:
     "Return the target of the model on `anchors` for the `bboxes`."
     # Anchors & bboxes are of the forms : XYXY
-    # Convert to XYWH
+    # Convert anchors and bboxes to XYWH format
     bboxes, anchors = convert_tlbr_2_cthw(bboxes), convert_tlbr_2_cthw(anchors)
 
     t_centers = (bboxes[..., :2] - anchors[..., :2]) / anchors[..., 2:]

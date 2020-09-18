@@ -4,8 +4,8 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
 
+from .box_utils import bbox_2_activ, matcher
 from .config import *
-from .utils.modelling import bbox_2_activ, matcher
 
 
 class RetinaNetLosses(nn.Module):

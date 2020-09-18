@@ -193,13 +193,6 @@ def convert_to_coco_api(ds):
 
 
 def get_coco_api_from_dataset(dataset):
-    for i in range(10):
-        if isinstance(dataset, torchvision.datasets.CocoDetection):
-            break
-        if isinstance(dataset, torch.utils.data.Subset):
-            dataset = dataset.dataset
-    if isinstance(dataset, torchvision.datasets.CocoDetection):
-        return dataset.coco
     return convert_to_coco_api(dataset)
 
 
@@ -214,10 +207,13 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         target = dict(image_id=image_id, annotations=target)
         if self._transforms is not None:
             img, target = self._transforms(img, target)
-        return img, target
+        return img, target, target["image_id"]
 
 
 def get_coco(root, image_set, transforms, mode="instances"):
+    """
+    Loads in COCO 2017 Dataset
+    """
     anno_file_template = "{}_{}2017.json"
     PATHS = {
         "train": (
@@ -228,7 +224,6 @@ def get_coco(root, image_set, transforms, mode="instances"):
             "val2017",
             os.path.join("annotations", anno_file_template.format(mode, "val")),
         ),
-        # "train": ("val2017", os.path.join("annotations", anno_file_template.format(mode, "val")))
     }
 
     t = [ConvertCocoPolysToMask()]
@@ -253,15 +248,3 @@ def get_coco(root, image_set, transforms, mode="instances"):
 
 def get_coco_kp(root, image_set, transforms):
     return get_coco(root, image_set, transforms, mode="person_keypoints")
-
-
-def _get_iou_types(model):
-    model_without_ddp = model
-    if isinstance(model, torch.nn.parallel.DistributedDataParallel):
-        model_without_ddp = model.module
-    iou_types = ["bbox"]
-    if isinstance(model_without_ddp, torchvision.models.detection.MaskRCNN):
-        iou_types.append("segm")
-    if isinstance(model_without_ddp, torchvision.models.detection.KeypointRCNN):
-        iou_types.append("keypoints")
-    return iou_types

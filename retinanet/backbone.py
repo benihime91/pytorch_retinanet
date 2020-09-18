@@ -340,7 +340,7 @@ loaders = {
 class BackBone(nn.Module):
     def __init__(
         self, kind: str = "resnet18", pretrained: bool = True, freeze_bn: bool = True,
-    ) -> None:
+    ):
         """Create a Backbone from `kind`"""
         super(BackBone, self).__init__()
         build_fn = loaders[kind]

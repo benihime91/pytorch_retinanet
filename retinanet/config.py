@@ -67,7 +67,7 @@ FREEZE_BN: bool = True
 BBOX_REG_WEIGHTS = [1.0, 1.0, 1.0, 1.0]
 
 # Inference cls score threshold, only anchors with score > INFERENCE_TH are
-# considered for inference (to improve speed)
+# considered for inference.
 SCORE_THRES: float = 0.05
 NMS_THRES: float = 0.5
 # Maximum number of detections to return per image during inference (100 is
