@@ -6,7 +6,7 @@ import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
 
-from retinanet.utilities import ifnone
+from .retinanet.utilities import ifnone
 
 # Turn interactive plotting off
 plt.ioff()
