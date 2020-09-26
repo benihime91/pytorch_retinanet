@@ -97,26 +97,22 @@ class Retinanet(nn.Module):
         pretrained = ifnone(pretrained, PRETRAINED_BACKBONE)
         nms_thres = ifnone(nms_thres, NMS_THRES)
         score_thres = ifnone(score_thres, SCORE_THRES)
-        max_detections_per_images = ifnone(
-            max_detections_per_images, MAX_DETECTIONS_PER_IMAGE
-        )
+        max_detections_per_images = ifnone(max_detections_per_images, MAX_DETECTIONS_PER_IMAGE)
         freeze_bn = ifnone(freeze_bn, FREEZE_BN)
         min_size = ifnone(min_size, MIN_IMAGE_SIZE)
         max_size = ifnone(max_size, MAX_IMAGE_SIZE)
         image_mean = ifnone(image_mean, MEAN)
         image_std = ifnone(image_std, STD)
         anchor_generator = ifnone(anchor_generator, AnchorGenerator())
+        logger = ifnone(logger, logging.getLogger(__name__))
 
         if backbone_kind not in __small__ + __big__:
-            raise ValueError(
-                f"Expected `backbone_kind` to be one of {__small__+__big__} got {backbone_kind}"
-            )
+            _prompt = f"Expected `backbone_kind` to be one of {__small__+__big__} got {backbone_kind}"
+            raise ValueError(_prompt)
 
-        # Modules for RetinaNet
+        # Instantiate modules for RetinaNet
         self.backbone_kind = backbone_kind
-        self.transform = GeneralizedRCNNTransform(
-            min_size, max_size, image_mean, image_std
-        )
+        self.transform = GeneralizedRCNNTransform(min_size, max_size, image_mean, image_std)
         self.backbone = get_backbone(backbone_kind, pretrained, freeze_bn=freeze_bn)
         fpn_szs = self._get_backbone_ouputs()
         self.fpn = FeaturePyramid(fpn_szs[0], fpn_szs[1], fpn_szs[2], 256)
@@ -130,7 +126,7 @@ class Retinanet(nn.Module):
         self.detections_per_img = max_detections_per_images
         self.num_classes = num_classes
 
-        logger = ifnone(logger, logging.getLogger(__name__))
+        # Log some information
         logger.info(f"Backbone : {backbone_kind}")
         logger.info(f"Score Threshold : {self.score_thres}")
         logger.info(f"NMS Threshold : {self.nms_thres}")
@@ -182,16 +178,16 @@ class Retinanet(nn.Module):
 
         detections = torch.jit.annotate(List[Dict[str, Tensor]], [])
 
-        for bb_per_im, sc_per_im, ancs_per_im, im_sz, lbl_per_im in zip(
-            bboxes, scores, anchors, im_szs, labels
-        ):
+        for bb_per_im, sc_per_im, ancs_per_im, im_sz, lbl_per_im in zip(bboxes, scores, anchors, im_szs, labels):
             all_boxes = []
             all_scores = []
             all_labels = []
-
+            # convert the activation i.e, outputs of the model to bounding boxes
             bb_per_im = activ_2_bbox(bb_per_im, ancs_per_im)
+            # clip the bounding -boxes to the image size
             bb_per_im = ops.clip_boxes_to_image(bb_per_im, im_sz)
 
+            # Iterate over each `cls_idx` in `num_classes` and do nms
             for cls_idx in range(num_classes):
                 # remove low scoring boxes and grab the predictions corresponding to the cls_idx
                 inds = torch.gt(sc_per_im[:, cls_idx], self.score_thres)
@@ -240,24 +236,13 @@ class Retinanet(nn.Module):
 
         return detections
 
-    def _get_outputs(
-        self, losses, detections
-    ) -> Union[Dict[str, Tensor], List[Dict[str, Tensor]]]:
-        "if `training` return losses else return `detections`"
-        if self.training:
-            return losses
-        else:
-            return detections
-
-    def forward(
-        self, images: List[Tensor], targets: Optional[List[Dict[str, Tensor]]] = None
-    ) -> Union[Dict[str, Tensor], List[Dict[str, Tensor]]]:
-
-        if self.training and targets is None:
-            raise ValueError("In training Model, `targets` must be given")
-
+    def predict(self, images: List[Tensor]) -> List[Dict[str, Tensor]]:
+        """
+        Computs predictions for the given model
+        """
+        targets = None
         orig_im_szs = []
-
+        # Store original images sizes used to resict the images
         for im in images:
             val = im.shape[-2:]
             assert len(val) == 2
@@ -270,17 +255,26 @@ class Retinanet(nn.Module):
         outputs = self.retinanet_head(feature_maps)
         # Generate anchors for the images
         anchors = self.anchor_generator(images, feature_maps)
-
-        # Structures to store losses and outputs
-        losses = {}
+        # store detections
         detections = torch.jit.annotate(List[Dict[str, Tensor]], [])
+        # computes detections from the given model
+        detections = self.process_detections(outputs, anchors, images.image_sizes)
+        detections = self.transform.postprocess(detections, images.image_sizes, orig_im_szs)
+        return detections
 
-        if self.training:
-            losses = self.compute_loss(targets, outputs, anchors)
-        else:
-            detections = self.process_detections(outputs, anchors, images.image_sizes)
-            detections = self.transform.postprocess(
-                detections, images.image_sizes, orig_im_szs
-            )
-        # Return Outputs
-        return self._get_outputs(losses, detections)
+    def forward(self, images: List[Tensor], targets: Optional[List[Dict[str, Tensor]]]) -> Dict[str, Tensor]:
+        """
+        Computes the loss of the model
+        """
+        # Foward pass of the Model
+        images, targets = self.transform(images, targets)
+        feature_maps = self.backbone(images.tensors)
+        feature_maps = self.fpn(feature_maps)
+        outputs = self.retinanet_head(feature_maps)
+        # Generate anchors for the images
+        anchors = self.anchor_generator(images, feature_maps)
+
+        # store losses
+        losses = {}
+        losses = self.compute_loss(targets, outputs, anchors)
+        return losses
