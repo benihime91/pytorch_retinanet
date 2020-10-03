@@ -1,9 +1,4 @@
-from typing import *
-
-
-def collate_fn(batch):
-    "`collate_fn` for pytorch obj_detection dataloader"
-    return tuple(zip(*batch))
+from typing import Any
 
 
 def ifnone(a: Any, b: Any) -> Any:

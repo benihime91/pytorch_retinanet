@@ -127,10 +127,9 @@ class Retinanet(nn.Module):
         self.num_classes = num_classes
 
         # Log some information
-        logger.info(f"Backbone : {backbone_kind}")
-        logger.info(f"Score Threshold : {self.score_thres}")
-        logger.info(f"NMS Threshold : {self.nms_thres}")
-        logger.info(f"Num Classes : {self.num_classes}")
+        logger.info(f"BACKBONE : {backbone_kind}")
+        logger.info(f"INPUT PARAMS : MAX_SIZE={max_size}, MIN_SIZE={min_size}")
+        logger.info(f"NUM CLASSES : {self.num_classes}")
 
     def _get_backbone_ouputs(self) -> List:
         if self.backbone_kind in __small__:
