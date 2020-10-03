@@ -56,21 +56,40 @@ def convert_annotations_to_df(annotation_dir, image_dir, image_set="train"):
     ]
 
     if image_set == "train":
-        xml_df["labels"] = encoder.fit_transform(xml_df["class"])
+        # label encoder encodes the labels from 0
+        # we need to add +1 so that labels are encode from 1 as our
+        # model reserves 0 for background class.
+        xml_df["labels"] = encoder.fit_transform(xml_df["class"]) + 1
     elif image_set == "val" or image_set == "test":
-        xml_df["labels"] = encoder.transform(xml_df["class"])
+        xml_df["labels"] = encoder.transform(xml_df["class"]) + 1
     return xml_df
 
 
 class PascalDataset(Dataset):
     """
-    Creates a object detection Dataset instance
+    Creates a object detection Dataset instance.
+
+    The dataset `__getitem__` should return:
+      - image: a Tensor of size `(channels, H, W)`
+      - target: a dict containing the following fields
+        * `boxes (FloatTensor[N, 4])`: the coordinates of the N bounding boxes in `[x0, y0, x1, y1]` format, 
+                                       ranging from 0 to W and 0 to H
+        * `labels (Int64Tensor[N])`: the label for each bounding box. 0 represents always the background class.
+        * `image_id (Int64Tensor[1])`: an image identifier. It should be unique between all the images in the dataset, 
+                                       and is used during evaluation
+        * `area (Tensor[N])`: The area of the bounding box. This is used during evaluation with the COCO metric, 
+                              to separate the metric scores between small, medium and large boxes.
+        * `iscrowd (UInt8Tensor[N])`: instances with iscrowd=True will be ignored during evaluation.
+      - image_id (Int64Tensor[1]): an image identifier. It should be unique between all the images in the dataset, 
+                                   and is used during evaluation.
     Args:
         1. dataframe : A pd.Dataframe instance or str corresponding to the 
                        path to the dataframe.
         For the Dataframe the `filename` column should correspond to the path to the images.
         Each row to should one annotations in the the form `xmin`, `ymin`, `xmax`, `yman`.
         Labels should be integers in the `labels` column.
+        To convert the pascal voc data in csv format use the `get_pascal` function.
+        
         2. transforms: (A.Compose) transforms should be a albumentation transformations.
                         the bbox params should be set to `pascal_voc` & to pass in class
                         use `class_labels`                  

@@ -77,8 +77,9 @@ class RetinaNetLosses(nn.Module):
         clas_mask = matches >= 0
         clas_pred = clas_pred[clas_mask]
 
-        # clas_tgt : [0, num_classes) -> [1, num_classes]
-        clas_tgt = clas_tgt + 1
+        # # clas_tgt : [0, num_classes) -> [1, num_classes]
+        # clas_tgt = clas_tgt + 1
+        # # no need to add +1 since clas_tgt: [1, num_classes]
         # Add background class to account for background in `matches`.
         # When there are no matches
         # bg class is predicted when none of the others go out.
