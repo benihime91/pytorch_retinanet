@@ -144,6 +144,9 @@ def visualize_boxes_and_labels_on_image_array(image,
     and creates a display string for each detection and overlays these
     on the image
 
+    Note: The imput image should be in normalized form i.e., the pixel values
+          should be in range [0,1].
+
     Args:
         image: uint8 numpy array with shape (img_height, img_width, 3)
         boxes: a numpy array of shape [N, 4]
