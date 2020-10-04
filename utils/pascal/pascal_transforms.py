@@ -37,5 +37,5 @@ def generate_pascal_category_names(df: pd.DataFrame):
     # Add the background class to the Category names
     # Since the labels start from the 1, we set the 0 value to be the
     # background class
-    CATEGORY_NAMES[0] == "__background__"
+    CATEGORY_NAMES[0] = "__background__"
     return CATEGORY_NAMES

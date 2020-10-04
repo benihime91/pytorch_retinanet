@@ -15,6 +15,11 @@ from utils.pascal import get_pascal
 from utils.pascal.pascal_transforms import compose_transforms
 
 
+def _get_model(hparams:DictConfig, **kwargs):
+    model = Retinanet(**hparams, **kwargs)
+    return model
+
+
 class RetinaNetModel(pl.LightningModule):
     """
     Lightning Class to wrap the RetinaNet Model.
@@ -25,11 +30,12 @@ class RetinaNetModel(pl.LightningModule):
     """
 
     def __init__(self, hparams: DictConfig):
+        super(RetinaNetModel, self).__init__()
         self.hparams = hparams
         # load model using model hparams
-        self.model = Retinanet(**self.hparams.model)
         self.fancy_logger = _get_logger(__name__)
-
+        self.model = _get_model(self.hparams, logger=self.fancy_logger)
+        
     def forward(self, xb, *args, **kwargs):
         return self.model(xb)
 
