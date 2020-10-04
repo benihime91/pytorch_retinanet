@@ -16,7 +16,7 @@ from utils.pascal.pascal_transforms import compose_transforms
 
 
 def _get_model(hparams:DictConfig, **kwargs):
-    model = Retinanet(**hparams, **kwargs)
+    model = Retinanet(**hparams.model, **kwargs)
     return model
 
 
@@ -53,7 +53,7 @@ class RetinaNetModel(pl.LightningModule):
             # Load in the COCO Train and Validation datasets
             self.trn_ds = get_coco(root=data_params.root_dir, image_set="train", transforms=trn_tfms)
             self.val_ds = get_coco(root=data_params.root_dir, image_set="val", transforms=val_tfms)
-            self.test_ds = None
+            self.test_ds = False
 
         # if pascal-dataset format load in the pascal dataset
         elif data_params.kind == "pascal":
@@ -61,8 +61,8 @@ class RetinaNetModel(pl.LightningModule):
             trn_tfms = compose_transforms(trn_tfms)
             val_tfms = compose_transforms()
             # Load in the pascal dataset from the csv files
-            self.trn_ds = get_pascal(data_params.trn_paths[0],data_params.trn_paths[1],"train",transforms=trn_tfms,)
-            self.val_ds = get_pascal(data_params.valid_paths[0],data_params.valid_paths[1],"test",transforms=val_tfms,)
+            self.trn_ds = get_pascal(data_params.trn_paths[0], data_params.trn_paths[1],"train", transforms=trn_tfms,)
+            self.val_ds = get_pascal(data_params.valid_paths[0], data_params.valid_paths[1], "test", transforms=val_tfms,)
 
             if data_params.test_paths:
                 self.test_ds = get_pascal(data_params.test_paths[0], data_params.test_paths[1],"test", transforms=val_tfms,)
@@ -105,11 +105,13 @@ class RetinaNetModel(pl.LightningModule):
         return loader
 
     def test_dataloader(self, *args, **kwargs):
-        if self.test_ds is None:
-            self.test_ds = self.val_ds
-
-        bs = self.hparams.dataloader.test_batch_size
-        loader = DataLoader(self.test_ds, bs, collate_fn=collate_fn, **self.hparams.dataloader.args)
+        if not self.test_ds:
+            bs = self.hparams.dataloader.valid_bs
+            loader = DataLoader(self.val_ds, bs, collate_fn=collate_fn, **self.hparams.dataloader.args)
+        else:
+            bs = self.hparams.dataloader.test_bs
+            loader = DataLoader(self.test_ds, bs, collate_fn=collate_fn, **self.hparams.dataloader.args)
+        
         # instantiate coco_api to track metrics
         prompt = "Converting dataset annotations in 'test_dataset' to COCO format for inference ..."
         self.fancy_logger.info(prompt)
