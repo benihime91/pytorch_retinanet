@@ -17,6 +17,7 @@ class RetinaNetLosses(nn.Module):
         self.beta = SMOOTH_L1_LOSS_BETA
 
     def smooth_l1_loss(self, input: Tensor, target: Tensor) -> torch.Tensor:
+        """Computes SmoothL1Loss"""
         if self.beta < 1e-5:
             loss = torch.abs(input - target)
         else:
@@ -28,10 +29,11 @@ class RetinaNetLosses(nn.Module):
     def focal_loss(self, clas_pred: Tensor, clas_tgt: Tensor) -> Tensor:
         """
         Loss used in RetinaNet for dense detection: https://arxiv.org/abs/1708.02002.
+        
         Args:
-            1. inputs: A float tensor of arbitrary shape.
+            1. clas_pred: A float tensor of arbitrary shape.
                        The predictions for each example.
-            2. targets: A float tensor with the same shape as inputs.
+            2. clas_tgt: A float tensor with the same shape as inputs.
                         Stores the binary classification label for each element in inputs
                         (0 for the negative class and 1 for the positive class).
         Returns:
@@ -81,10 +83,15 @@ class RetinaNetLosses(nn.Module):
         # clas_tgt = clas_tgt + 1
         # # no need to add +1 since clas_tgt: [1, num_classes]
         # Add background class to account for background in `matches`.
+
         # When there are no matches
         # bg class is predicted when none of the others go out.
+        # add 0 label for the background class
         clas_tgt = torch.cat([clas_tgt.new_zeros(1).long(), clas_tgt])
         clas_tgt = clas_tgt[matches[clas_mask]]
+
+        # convert the integer lables into a one-hot vector and omit
+        # the first column which corresponds to the 0th class as ,
         # no loss for the first(background) class
         clas_tgt = F.one_hot(clas_tgt, num_classes=self.n_c + 1)[:, 1:]
         clas_tgt = clas_tgt.to(clas_pred.dtype)

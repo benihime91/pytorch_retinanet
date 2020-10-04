@@ -98,9 +98,7 @@ class Retinanet(nn.Module):
         pretrained = ifnone(pretrained, PRETRAINED_BACKBONE)
         nms_thres = ifnone(nms_thres, NMS_THRES)
         score_thres = ifnone(score_thres, SCORE_THRES)
-        max_detections_per_images = ifnone(
-            max_detections_per_images, MAX_DETECTIONS_PER_IMAGE
-        )
+        max_detections_per_images = ifnone(max_detections_per_images, MAX_DETECTIONS_PER_IMAGE)
         freeze_bn = ifnone(freeze_bn, FREEZE_BN)
         min_size = ifnone(min_size, MIN_IMAGE_SIZE)
         max_size = ifnone(max_size, MAX_IMAGE_SIZE)
@@ -108,6 +106,7 @@ class Retinanet(nn.Module):
         image_std = ifnone(image_std, STD)
         anchor_generator = ifnone(anchor_generator, AnchorGenerator())
         logger = ifnone(logger, logging.getLogger(__name__))
+        logger.name = __name__
 
         if backbone_kind not in __small__ + __big__:
             _prompt = f"Expected `backbone_kind` to be one of {__small__+__big__} got {backbone_kind}"
@@ -115,9 +114,7 @@ class Retinanet(nn.Module):
 
         # Instantiate modules for RetinaNet
         self.backbone_kind = backbone_kind
-        self.transform = GeneralizedRCNNTransform(
-            min_size, max_size, image_mean, image_std
-        )
+        self.transform = GeneralizedRCNNTransform(min_size, max_size, image_mean, image_std)
         self.backbone = get_backbone(backbone_kind, pretrained, freeze_bn=freeze_bn)
         fpn_szs = self._get_backbone_ouputs()
         self.fpn = FeaturePyramid(fpn_szs[0], fpn_szs[1], fpn_szs[2], 256)
@@ -265,9 +262,7 @@ class Retinanet(nn.Module):
         detections = torch.jit.annotate(List[Dict[str, Tensor]], [])
         # computes detections from the given model
         detections = self.process_detections(outputs, anchors, images.image_sizes)
-        detections = self.transform.postprocess(
-            detections, images.image_sizes, orig_im_szs
-        )
+        detections = self.transform.postprocess(detections, images.image_sizes, orig_im_szs)
         return detections
 
     def forward(

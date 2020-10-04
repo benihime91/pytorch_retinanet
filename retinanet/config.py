@@ -45,7 +45,7 @@ ANCHOR_OFFSET: float = 0.0
 # ----------------------------------------------------------------------------- #
 # RetinaNet Head
 # ----------------------------------------------------------------------------- #
-NUM_CLASSES: int = 80
+NUM_CLASSES: int = 90
 # This is the number of foreground classes.
 
 # The network used to compute the features for the model.

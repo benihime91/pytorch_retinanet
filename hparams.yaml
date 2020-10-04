@@ -1,0 +1,77 @@
+# ============================================== #
+# config file to instantiate the Lightning Model
+# ============================================== #
+
+# config paramters for the model backbone
+model:
+  backbone_kind: resnet50 # backbone of the model
+  num_classes: 90 # number of classes (excluding the background class)
+  freeze_bn: True # wether to freeze the backone of the model
+  min_size: 800 # Size of the smallest side of the image during training
+  max_size: 1600 # Maximum size of the side of the image during training
+  max_detections_per_images: 100
+  nms_thres: 0.5
+  score_thres: 0.05
+
+# Config parameters for the Daaset
+dataset:
+  # dataset kind one of coco or pascal
+  kind: false
+  # root directory to where the coco datasets are stored
+  # this is not used if dataset.kind == "pascal"
+  # for the coco dataset the test dataset is used as
+  # both the validation and test dataset. ie., validation loss
+  # and coco eval metrics are computed on the same dataset
+  root_dir: false
+  # if dataset is in pascal format then train , validation and test image and annotation paths must be given
+  # the pascal dataset must be first converted to csv format
+  # the paths should be a list contraining the paths to the annotations
+  # and the images in that order
+  trn_paths: false
+  # if the data-kind is pascal , you can provide both a validation and test dataset
+  # the validtion loss is calculated over the validation dataset and
+  # the coco eval metrics is calculated over the test dataset
+  # validation dataset must be proveded,
+  # test dataset is Optional, if test dataset is not proveded then, COCO-metrics are
+  # computed over the validation dataset.
+  valid_paths: false
+  test_paths: false
+
+# paramters for the pytroch DataLoader
+dataloader:
+  # Batch sizes
+  train_bs: 2
+  valid_bs: 30
+  test_bs: 30
+  args:
+    # extra arguments to be passed to the dataloaders
+    num_workers: 0
+    pin_memory: True
+
+# Albumentation transformations to use for the pascal dataset
+# NOTE: these transformations are only supported for the dataset that is the
+# specified csv format
+# These transformations are applied to the train dataset only
+# no augmentation is applied to test, validation datasets
+pascal_transforms:
+  - class_name: albumentations.HorizontalFlip
+    params:
+      p: 0.5
+
+# Optimzer to use for Training
+optimizer:
+  class_name: torch.optim.SGD
+  params:
+    lr: 0.003
+    weight_decay: 0.0001
+    momentum: 0.9
+
+# Scheduler to use for Training
+scheduler:
+  class_name: torch.optim.lr_scheduler.MultiStepLR
+  params:
+    milestones: [16, 22]
+    gamma: 0.1
+
+  interval: 1
+  frequency: epoch
