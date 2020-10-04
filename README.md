@@ -38,4 +38,27 @@ The code is heavily influended by [Detectron2](https://github.com/facebookresear
     
     # load in the hparams yaml file
     hparams = OmegaConf.load("hparams.yaml")
+
+    # instantiate lightning module
+    model = RetinaNetModel(hparams=hparams)
+
+    # instantiate lightning-trainer for trian and test
+    # Trainer specific arguments see 
+    # https://pytorch-lightning.readthedocs.io/en/latest/trainer.html
+    trainer = Trainer(precision=16, 
+                      # if training on GPU
+                      gpus=1, 
+                      callbacks=[LogCallback()], 
+                      weights_summary=None,
+                      terminate_on_nan = True, 
+                      deterministic=True,
+                      # total number of epochs to train for
+                      max_epochs=1, 
+                      )
+
+    # start train
+    trainer.fit(model)
+
+    # to test model using COCO API
+    trainer.test(model)
    ```
