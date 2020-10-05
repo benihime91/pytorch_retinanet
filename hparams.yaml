@@ -9,9 +9,6 @@ model:
   freeze_bn: True # wether to freeze the backone of the model
   min_size: 800 # Size of the smallest side of the image during training
   max_size: 1600 # Maximum size of the side of the image during training
-  max_detections_per_images: 100
-  nms_thres: 0.5
-  score_thres: 0.05
 
 # Config parameters for the Daaset
 dataset:
@@ -47,7 +44,7 @@ transforms:
 optimizer:
   class_name: torch.optim.SGD
   params:
-    lr: 0.005
+    lr: 0.001
     weight_decay: 0.001
     momentum: 0.9
 
