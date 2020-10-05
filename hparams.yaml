@@ -15,25 +15,10 @@ model:
 
 # Config parameters for the Daaset
 dataset:
-  # dataset kind one of coco or pascal
+  # dataset kind one of [coco, pascal, csv]
   kind: false
-  # root directory to where the coco datasets are stored
-  # this is not used if dataset.kind == "pascal"
-  # for the coco dataset the test dataset is used as
-  # both the validation and test dataset. ie., validation loss
-  # and coco eval metrics are computed on the same dataset
   root_dir: false
-  # if dataset is in pascal format then train , validation and test image and annotation paths must be given
-  # the pascal dataset must be first converted to csv format
-  # the paths should be a list contraining the paths to the annotations
-  # and the images in that order
   trn_paths: false
-  # if the data-kind is pascal , you can provide both a validation and test dataset
-  # the validtion loss is calculated over the validation dataset and
-  # the coco eval metrics is calculated over the test dataset
-  # validation dataset must be proveded,
-  # test dataset is Optional, if test dataset is not proveded then, COCO-metrics are
-  # computed over the validation dataset.
   valid_paths: false
   test_paths: false
 
@@ -50,10 +35,10 @@ dataloader:
 
 # Albumentation transformations to use for the pascal dataset
 # NOTE: these transformations are only supported for the dataset that is the
-# specified csv format
+# specified csv format or for pascal dataset format
 # These transformations are applied to the train dataset only
 # no augmentation is applied to test, validation datasets
-pascal_transforms:
+transforms:
   - class_name: albumentations.HorizontalFlip
     params:
       p: 0.5
@@ -62,16 +47,20 @@ pascal_transforms:
 optimizer:
   class_name: torch.optim.SGD
   params:
-    lr: 0.003
-    weight_decay: 0.0001
+    lr: 0.005
+    weight_decay: 0.001
     momentum: 0.9
 
 # Scheduler to use for Training
+# check : https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+# on how a scheduler is used in pytorch lightning
 scheduler:
-  class_name: torch.optim.lr_scheduler.MultiStepLR
+  class_name: torch.optim.lr_scheduler.ReduceLROnPlateau
   params:
-    milestones: [16, 22]
-    gamma: 0.1
+    mode: min
+    factor: 0.1
+    patience: 8
 
   interval: 1
   frequency: epoch
+  monitor: val_loss # if monitor parameter is not required set this to be `false`
