@@ -132,7 +132,7 @@ This is controlled via the `dataset.kind` parameter in `hparams.yaml`.
 
    ```yaml
    dataset:
-      kind: pascal
+      kind: csv
       trn_paths: "train_data.csv"
       val_paths: "val_data.csv"
       test_paths: "test_data.csv" # this is Optional
