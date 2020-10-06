@@ -182,33 +182,34 @@ class Retinanet(nn.Module):
         for bb_per_im, sc_per_im, ancs_per_im, im_sz, lbl_per_im in zip(
             bboxes, scores, anchors, im_szs, labels
         ):
-            all_boxes = []
+            all_boxes  = []
             all_scores = []
             all_labels = []
             # convert the activation i.e, outputs of the model to bounding boxes
             bb_per_im = activ_2_bbox(bb_per_im, ancs_per_im)
-            # clip the bounding -boxes to the image size
+            # clip the bounding boxes to the image size
             bb_per_im = ops.clip_boxes_to_image(bb_per_im, im_sz)
 
             # Iterate over each `cls_idx` in `num_classes` and do nms
+            # to each class individually
             for cls_idx in range(num_classes):
-                # remove low scoring boxes and grab the predictions corresponding to the cls_idx
+                # remove low predicitons with scores < score_thres
+                #  and grab the predictions corresponding to the cls_idx
                 inds = torch.gt(sc_per_im[:, cls_idx], self.score_thres)
                 bb_per_cls, sc_per_cls, lbl_per_cls = (
                     bb_per_im[inds],
                     sc_per_im[inds, cls_idx],
                     lbl_per_im[inds, cls_idx],
                 )
-                # remove empty boxes
+                # remove boxes that are too small ~(1-02)
                 keep = ops.remove_small_boxes(bb_per_cls, min_size=1e-2)
                 bb_per_cls, sc_per_cls, lbl_per_cls = (
                     bb_per_cls[keep],
                     sc_per_cls[keep],
                     lbl_per_cls[keep],
                 )
-                # non-maximum suppression, independently done per class
+                # compute non max supression to supress overlapping boxes
                 keep = ops.nms(bb_per_cls, sc_per_cls, self.nms_thres)
-
                 bb_per_cls, sc_per_cls, lbl_per_cls = (
                     bb_per_cls[keep],
                     sc_per_cls[keep],
@@ -220,12 +221,19 @@ class Retinanet(nn.Module):
                 all_labels.append(lbl_per_cls)
 
             # Convert to tensors
-            all_boxes = torch.cat(all_boxes, dim=0)
+            all_boxes  = torch.cat(all_boxes, dim=0)
             all_scores = torch.cat(all_scores, dim=0)
             all_labels = torch.cat(all_labels, dim=0)
-            # Sort by scores
+            
+            # model is going to predict classes which are going to be in the range of [0, num_classes]
+            # 0 is reserved for the background class for which no loss is calculate , so 
+            # we will add 1 to all the class_predictions to shift the predicitons range from
+            # [0, num_classes) -> [1, num_classes]
+            all_labels = all_labels + 1 
+            
+            # Sort by scores and 
+            #  Grab the idxs from the corresponding to the topk predictions
             _, topk_idxs = all_scores.sort(descending=True)
-            # Grab the idxs from the corresponding to the topk predictions
             topk_idxs = topk_idxs[: self.detections_per_img]
             all_boxes, all_scores, all_labels = (
                 all_boxes[topk_idxs],
@@ -233,10 +241,7 @@ class Retinanet(nn.Module):
                 all_labels[topk_idxs],
             )
 
-            detections.append(
-                {"boxes": all_boxes, "scores": all_scores, "labels": all_labels,}
-            )
-
+            detections.append({"boxes": all_boxes, "scores": all_scores, "labels": all_labels,})
         return detections
 
     def predict(self, images: List[Tensor]) -> List[Dict[str, Tensor]]:

@@ -11,10 +11,10 @@ from .config import *
 class RetinaNetLosses(nn.Module):
     def __init__(self, num_classes: int) -> None:
         super(RetinaNetLosses, self).__init__()
-        self.n_c = num_classes
+        self.n_c   = num_classes
         self.alpha = FOCAL_LOSS_ALPHA
         self.gamma = FOCAL_LOSS_GAMMA
-        self.beta = SMOOTH_L1_LOSS_BETA
+        self.beta  = SMOOTH_L1_LOSS_BETA
 
     def smooth_l1_loss(self, input: Tensor, target: Tensor) -> torch.Tensor:
         """Computes SmoothL1Loss"""
@@ -28,7 +28,7 @@ class RetinaNetLosses(nn.Module):
 
     def focal_loss(self, clas_pred: Tensor, clas_tgt: Tensor) -> Tensor:
         """
-        Loss used in RetinaNet for dense detection: https://arxiv.org/abs/1708.02002.
+        Focal Loss used in RetinaNet: https://arxiv.org/abs/1708.02002.
         
         Args:
             1. clas_pred: A float tensor of arbitrary shape.
@@ -43,9 +43,7 @@ class RetinaNetLosses(nn.Module):
         weights = clas_tgt * (1 - ps) + (1 - clas_tgt) * ps
         alphas = (1 - clas_tgt) * self.alpha + clas_tgt * (1 - self.alpha)
         weights.pow_(self.gamma).mul_(alphas)
-        clas_loss = F.binary_cross_entropy_with_logits(
-            clas_pred, clas_tgt, weights, reduction="sum"
-        )
+        clas_loss = F.binary_cross_entropy_with_logits(clas_pred, clas_tgt, weights, reduction="sum")
         return clas_loss
 
     def calc_loss(
@@ -79,13 +77,18 @@ class RetinaNetLosses(nn.Module):
         clas_mask = matches >= 0
         clas_pred = clas_pred[clas_mask]
 
+        # convert predictions from [0, num_classes) -> [1, num_classes]
+        clas_pred = clas_pred + 1
+
         # # clas_tgt : [0, num_classes) -> [1, num_classes]
         # clas_tgt = clas_tgt + 1
         # # no need to add +1 since clas_tgt: [1, num_classes]
         # Add background class to account for background in `matches`.
 
         # When there are no matches
-        # bg class is predicted when none of the others go out.
+        # bg class is predicted so, we need to add the backgorund class
+        # to each of the targets , or else there will be index error, as
+        # bboxes are predicted for background class as well
         # add 0 label for the background class
         clas_tgt = torch.cat([clas_tgt.new_zeros(1).long(), clas_tgt])
         clas_tgt = clas_tgt[matches[clas_mask]]
@@ -117,18 +120,13 @@ class RetinaNetLosses(nn.Module):
         classification_losses = []
         regression_losses = []
 
-        for cls_pred, bb_pred, targs, ancs in zip(
-            clas_preds, bbox_preds, targets, anchors
-        ):
-
+        for cls_pred, bb_pred, targs, ancs in zip(clas_preds, bbox_preds, targets, anchors):
             # Extract the Labels & boxes from the targets
             class_targs, bbox_targs = targs["labels"], targs["boxes"]
-
-            # Compute loss
-            regression_loss, classification_loss = self.calc_loss(
-                ancs, cls_pred, bb_pred, class_targs, bbox_targs
-            )
-
+            # Compute losses
+            losses = self.calc_loss(ancs,cls_pred, bb_pred, class_targs, bbox_targs)
+            # unpack the losses                                                     
+            regression_loss, classification_loss = losses
             # Append Losses of all the batches
             classification_losses.append(classification_loss)
             regression_losses.append(regression_loss)
