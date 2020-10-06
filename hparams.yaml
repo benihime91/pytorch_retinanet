@@ -1,8 +1,12 @@
-# ============================================== #
-# config file to instantiate the Lightning Model
-# ============================================== #
+###################################################################
+# CONFIG FILE TO INSTANTIATE THE LIGHTNING MODEL :
+###################################################################
 
-# config paramters for the model backbone
+# ============================================================== #
+# RETINANET MODEL PARAMETERS
+# ============================================================== #
+# set the parameters to be passed on to the retianet mode here
+# NOTE: the full set of arguemnts can be found in `retinanet/config.py` .
 model:
   backbone_kind: resnet50 # backbone of the model
   num_classes: 90 # number of classes (excluding the background class)
@@ -10,9 +14,21 @@ model:
   min_size: 800 # Size of the smallest side of the image during training
   max_size: 1600 # Maximum size of the side of the image during training
 
-# Config parameters for the Daaset
+# ============================================================== #
+# DATASETS AND DATALOADERS :
+# ============================================================== #
+# the dataset format can be of three types : 1. coco   2.pascal   3.csv ,
+# as described in the the README.md file
+# set the type of dataset that is to be used in the `kind` argument.
+
+# NOTE: test_paths is Optional but valid_paths, trn_paths is required for
+# "pascal" and "csv" dataset.
+
+# NOTE: if validation data is not available then set the `valid_paths` arguemnt
+# to point to the test data and set `test_paths` to be false, this will then use
+# the validation data as both the test and validiton data, 1.e.,
+# validtion loss and COCO-API results will be computed in the same dastaset
 dataset:
-  # dataset kind one of [coco, pascal, csv]
   kind: false
   root_dir: false
   trn_paths: false
@@ -30,7 +46,9 @@ dataloader:
     num_workers: 0
     pin_memory: True
 
-# Albumentation transformations to use for the pascal dataset
+# =========================================================================
+# Albumentation transformations to use for the pascal or csv dataset
+# =========================================================================
 # NOTE: these transformations are only supported for the dataset that is the
 # specified csv format or for pascal dataset format
 # These transformations are applied to the train dataset only
@@ -40,7 +58,9 @@ transforms:
     params:
       p: 0.5
 
-# Optimzer to use for Training
+# =========================================================================
+# OPTIMIZER AND SCHEDULER
+# =========================================================================
 optimizer:
   class_name: torch.optim.SGD
   params:
@@ -48,9 +68,8 @@ optimizer:
     weight_decay: 0.001
     momentum: 0.9
 
-# Scheduler to use for Training
+# NOTE: for the format of the scheduler supported in pytorch lightning
 # check : https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
-# on how a scheduler is used in pytorch lightning
 scheduler:
   class_name: torch.optim.lr_scheduler.ReduceLROnPlateau
   params:
@@ -58,6 +77,15 @@ scheduler:
     factor: 0.1
     patience: 8
 
+  # this parameters determines how many times a schdeuler should be
+  # called at each scheduling step.
   interval: 1
+  # can be one of epoch or step
+  # this parameter determines when the scheduler scheduler be called
+  # after each epoch or after each batch (i.e, step)
   frequency: epoch
-  monitor: val_loss # if monitor parameter is not required set this to be `false`
+  # if monitor parameter is not required set this to be `false`
+  # if set this parameters monitors the `val_loss` of the model
+  # this parameteris required for schdulers the scheduler the
+  # learning_rate based on a value
+  monitor: val_loss

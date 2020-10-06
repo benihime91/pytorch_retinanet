@@ -53,77 +53,78 @@ class RetinaNetModel(pl.LightningModule):
             trn_tfms = Compose([ToTensor(), RandomHorizontalFlip(prob=0.5)])
             val_tfms = Compose([ToTensor()])
             # Load in the COCO Train and Validation datasets
-            self.trn_ds = get_coco(
-                root=data_params.root_dir, image_set="train", transforms=trn_tfms
-            )
-            self.val_ds = get_coco(
-                root=data_params.root_dir, image_set="val", transforms=val_tfms
-            )
+            self.trn_ds = get_coco(root=data_params.root_dir, image_set="train", transforms=trn_tfms)
+            self.val_ds = get_coco(root=data_params.root_dir, image_set="val", transforms=val_tfms)
+            # the test dataset is the same as the validation dataset for COCO
             self.test_ds = False
 
         # if pascal-dataset format load in the pascal dataset
         elif data_params.kind == "pascal":
-            trn_tfms = [
-                load_obj(i["class_name"])(**i["params"])
-                for i in self.hparams.transforms
-            ]
+            # instantiate the transformas for the dataset
+            trn_tfms = [load_obj(i["class_name"])(**i["params"]) for i in self.hparams.transforms]
             trn_tfms = compose_transforms(trn_tfms)
             val_tfms = compose_transforms()
-            # Load in the pascal dataset from the csv files
-            self.trn_ds = get_pascal(
-                data_params.trn_paths[0],
-                data_params.trn_paths[1],
-                "train",
-                transforms=trn_tfms,
-            )
-
-            self.val_ds = get_pascal(
-                data_params.valid_paths[0],
-                data_params.valid_paths[1],
-                "test",
-                transforms=val_tfms,
-            )
+            # Load in the pascal dataset 
+            self.trn_ds = get_pascal(data_params.trn_paths[0], 
+                                     data_params.trn_paths[1], 
+                                     "train", 
+                                     transforms=trn_tfms,
+                                     )
+            # Load in the validation dataset
+            self.val_ds = get_pascal(data_params.valid_paths[0],
+                                     data_params.valid_paths[1],
+                                     "test",
+                                     transforms=val_tfms,
+                                     )
 
             if data_params.test_paths:
-                self.test_ds = get_pascal(
-                    data_params.test_paths[0],
-                    data_params.test_paths[1],
-                    "test",
-                    transforms=val_tfms,
-                )
+                # if separate test dataset is given load in the test dataset
+                # else the validation dataset is used as the test dataset
+                self.test_ds = get_pascal(data_params.test_paths[0], 
+                                          data_params.test_paths[1], 
+                                          "test", 
+                                          transforms=val_tfms,
+                                          )
             else:
                 self.test_ds = False
 
         # if csv-data format
         elif data_params.kind == "csv":
-            trn_tfms = [
-                load_obj(i["class_name"])(**i["params"])
-                for i in self.hparams.transforms
-            ]
+            # instantiate the transformations
+            trn_tfms = [load_obj(i["class_name"])(**i["params"]) for i in self.hparams.transforms]
             trn_tfms = compose_transforms(trn_tfms)
             val_tfms = compose_transforms()
             # load in the datasets from the csv files
+            # load in the train dataset
             self.trn_ds = PascalDataset(data_params.trn_paths, trn_tfms)
+            # load in the validation dataset
             self.val_ds = PascalDataset(data_params.valid_paths, val_tfms)
 
             if data_params.test_paths:
+                # if test dataset is given load in the test dataset
+                # else the test validaiton datset is used as the test dataset
                 self.test_ds = PascalDataset(data_params.test_paths, val_tfms)
             else:
                 self.test_ds = False
 
         else:
+            # raise error is dataset is other than "coco", "pascal", "csv"
             raise ValueError("DATASET_KIND not supported")
 
     def configure_optimizers(self, *args, **kwargs):
+        # trainable parameters
         params = [p for p in self.model.parameters() if p.requires_grad]
-        self.optimizer = load_obj(self.hparams.optimizer.class_name)(
-            params, **self.hparams.optimizer.params
-        )
-
-        self.scheduler = load_obj(self.hparams.scheduler.class_name)(
-            self.optimizer, **self.hparams.scheduler.params
-        )
-
+        # instantiate the Optimizer
+        self.optimizer = (
+            load_obj(self.hparams.optimizer.class_name)(
+                params, **self.hparams.optimizer.params)
+                )
+        # instantite schceduler
+        self.scheduler = (
+            load_obj(self.hparams.scheduler.class_name)(
+                self.optimizer, **self.hparams.scheduler.params)
+                )
+        # convert the scheduler to lightning format
         if not self.hparams.scheduler.monitor:
             self.scheduler = {
                 "scheduler": self.scheduler,
@@ -141,43 +142,47 @@ class RetinaNetModel(pl.LightningModule):
         # log optimizer and scheduler
         self.fancy_logger.info(f"OPTIMIZER_NAME : {self.optimizer.__class__.__name__}")
         self.fancy_logger.info(f"LEARNING_RATE: {self.hparams.optimizer.params.lr}")
-        self.fancy_logger.info(
-            f"WEIGHT_DECAY: {self.hparams.optimizer.params.weight_decay}"
-        )
-        self.fancy_logger.info(
-            f"LR_SCHEDULER_NAME : {self.scheduler['scheduler'].__class__.__name__}"
-        )
+        self.fancy_logger.info(f"WEIGHT_DECAY: {self.hparams.optimizer.params.weight_decay}")
+        self.fancy_logger.info(f"LR_SCHEDULER_NAME : {self.scheduler['scheduler'].__class__.__name__}")
         return [self.optimizer], [self.scheduler]
 
     def train_dataloader(self, *args, **kwargs):
         bs = self.hparams.dataloader.train_bs
-        loader = DataLoader(
-            self.trn_ds,
-            bs,
-            shuffle=True,
-            collate_fn=collate_fn,
-            **self.hparams.dataloader.args,
-        )
+        # instantiate train dataloader
+        loader = DataLoader(self.trn_ds,
+                            bs,
+                            shuffle=True,
+                            collate_fn=collate_fn,
+                            **self.hparams.dataloader.args,)
         return loader
 
     def val_dataloader(self, *args, **kwargs):
         bs = self.hparams.dataloader.valid_bs
-        loader = DataLoader(
-            self.val_ds, bs, collate_fn=collate_fn, **self.hparams.dataloader.args
-        )
+        # instantiate validation dataloader
+        loader = DataLoader(self.val_ds, 
+                            bs, 
+                            collate_fn=collate_fn, 
+                            **self.hparams.dataloader.args 
+                            )
         return loader
 
     def test_dataloader(self, *args, **kwargs):
         if not self.test_ds:
             bs = self.hparams.dataloader.valid_bs
-            loader = DataLoader(
-                self.val_ds, bs, collate_fn=collate_fn, **self.hparams.dataloader.args
-            )
+            # instantiate dataloader using test datset if test datset is given
+            # else use the validation dataset for the test dataloader
+            loader = DataLoader(self.val_ds, 
+                                bs, 
+                                collate_fn=collate_fn, 
+                                **self.hparams.dataloader.args
+                                )
         else:
             bs = self.hparams.dataloader.test_bs
-            loader = DataLoader(
-                self.test_ds, bs, collate_fn=collate_fn, **self.hparams.dataloader.args
-            )
+            loader = DataLoader(self.test_ds, 
+                                bs, 
+                                collate_fn=collate_fn, 
+                                **self.hparams.dataloader.args
+                                )
 
         # instantiate coco_api to track metrics
         prompt = "Converting dataset annotations in 'test_dataset' to COCO format for inference ..."
@@ -188,6 +193,9 @@ class RetinaNetModel(pl.LightningModule):
         self.fancy_logger.info(prompt)
         return loader
 
+    # Training step : 
+    # model gives out the regression_loss(smooth_l1_loss) and 
+    # classification_loss(focal_Loss) of the model inputs ie., the train dataloader
     def training_step(self, batch, batch_idx, *args, **kwargs):
         images, targets, _ = batch  # unpack the one batch from the DataLoader
         targets = [{k: v for k, v in t.items()} for t in targets]  # Unpack the Targets
@@ -197,6 +205,9 @@ class RetinaNetModel(pl.LightningModule):
         losses = sum(loss for loss in loss_dict.values())
         return {"loss": losses, "log": loss_dict, "progress_bar": loss_dict}
 
+    # validaton step: 
+    # model gives out the regression_loss(smooth_l1_loss) and 
+    # classification_loss(focal_Loss) of the model inputs ie., the validation dataloader
     def validation_step(self, batch, batch_idx, *args, **kwargs):
         images, targets, _ = batch  # unpack the one batch from the DataLoader
         targets = [{k: v for k, v in t.items()} for t in targets]  # Unpack the Targets
@@ -206,12 +217,13 @@ class RetinaNetModel(pl.LightningModule):
         loss = sum(loss for loss in loss_dict.values())
         loss = torch.as_tensor(loss)
         logs = {"val_loss": loss}
-        return {
-            "val_loss": loss,
-            "log": logs,
-            "progress_bar": logs,
-        }
+        return {"val_loss": loss, "log": logs, "progress_bar": logs,}
 
+    # test step : 
+    # the model computes the AP results on using COCO-API
+    # with the predictions of the model
+    # to get the predictions of the model we need to use the .predict method
+    # of the retinanet model
     def test_step(self, batch, batch_idx, *args, **kwargs):
         images, targets, _ = batch
         targets = [{k: v for k, v in t.items()} for t in targets]
@@ -224,16 +236,13 @@ class RetinaNetModel(pl.LightningModule):
         # coco results
         self.fancy_logger.info("Preparing results for COCO format ...")
         self.fancy_logger.info("Evaluating predictions ...")
+        # compute COCO-API results
         self.test_evaluator.accumulate()
         self.test_evaluator.summarize()
         metric = self.test_evaluator.coco_eval["bbox"].stats[0]
         metric = torch.as_tensor(metric)
         logs = {"AP": metric}
-        return {
-            "AP": metric,
-            "log": logs,
-            "progress_bar": logs,
-        }
+        return {"AP": metric, "log": logs, "progress_bar": logs,}
 
 
 class LogCallback(pl.Callback):
