@@ -127,9 +127,9 @@ class RetinaNetLosses(nn.Module):
             # Extract the Labels & boxes from the targets
             class_targs, bbox_targs = targs["labels"], targs["boxes"]
             # Compute losses
-            losses = self.calc_loss(ancs,cls_pred, bb_pred, class_targs, bbox_targs)
+            model_losses = self.calc_loss(ancs,cls_pred, bb_pred, class_targs, bbox_targs)
             # unpack the losses                                                     
-            regression_loss, classification_loss = losses
+            regression_loss, classification_loss = model_losses
             # Append Losses of all the batches
             classification_losses.append(classification_loss)
             regression_losses.append(regression_loss)
