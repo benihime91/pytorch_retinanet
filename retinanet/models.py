@@ -1,5 +1,4 @@
 import logging
-from logging import Logger
 from typing import *
 
 import torch
@@ -232,7 +231,7 @@ class Retinanet(nn.Module):
             all_labels = all_labels + 1 
             
             # Sort by scores and 
-            #  Grab the idxs from the corresponding to the topk predictions
+            # Grab the idxs from the corresponding to the topk predictions
             _, topk_idxs = all_scores.sort(descending=True)
             topk_idxs = topk_idxs[: self.detections_per_img]
             all_boxes, all_scores, all_labels = (
@@ -283,7 +282,6 @@ class Retinanet(nn.Module):
         outputs = self.retinanet_head(feature_maps)
         # Generate anchors for the images
         anchors = self.anchor_generator(images, feature_maps)
-
         # store losses
         losses = {}
         losses = self.compute_loss(targets, outputs, anchors)

@@ -32,9 +32,9 @@ class RetinaNetLosses(nn.Module):
         
         Args:
             1. clas_pred: A float tensor of arbitrary shape.
-                       The predictions for each example.
+                         The predictions for each example.
             2. clas_tgt: A float tensor with the same shape as inputs.
-                        Stores the binary classification label for each element in inputs
+                         Stores the binary classification label for each element in inputs
                         (0 for the negative class and 1 for the positive class).
         Returns:
             Loss tensor
@@ -77,7 +77,10 @@ class RetinaNetLosses(nn.Module):
         clas_mask = matches >= 0
         clas_pred = clas_pred[clas_mask]
 
-        # convert predictions from [0, num_classes) -> [1, num_classes]
+        # model is going to predict classes which are going to be in the range of [0, num_classes]
+        # 0 is reserved for the background class for which no loss is calculate , so 
+        # we will add 1 to all the class_predictions to shift the predicitons range from
+        # [0, num_classes) -> [1, num_classes]
         clas_pred = clas_pred + 1
 
         # # clas_tgt : [0, num_classes) -> [1, num_classes]
