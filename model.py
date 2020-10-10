@@ -125,7 +125,7 @@ class RetinaNetModel(pl.LightningModule):
         self.fancy_logger.info(f"WEIGHT_DECAY: {self.hparams.optimizer.params.weight_decay}")
         
         # instantite schceduler if hprams.scheduler is not None
-        if self.hparams.self.hparams.scheduler.class_name is None:
+        if self.hparams.scheduler.class_name is None:
             # return only the optimizer if scheduler class_name is None
             return [self.optimizer]
         
