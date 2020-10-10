@@ -338,13 +338,11 @@ loaders = {
 
 
 class BackBone(nn.Module):
-    def __init__(
-        self, kind: str = "resnet18", pretrained: bool = True, freeze_bn: bool = True,
-    ):
+    def __init__(self, kind: str = "resnet18", pretrained: bool = True, freeze_bn: bool = True, **kwargs):
         """Create a Backbone from `kind`"""
         super(BackBone, self).__init__()
         build_fn = loaders[kind]
-        self.backbone = build_fn(pretrained=pretrained)
+        self.backbone = build_fn(pretrained=pretrained, **kwargs)
 
         # Freeze batch_norm: Not sure why ?? but every other implementation does it
         if freeze_bn:

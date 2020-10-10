@@ -119,32 +119,55 @@ class RetinaNetModel(pl.LightningModule):
             load_obj(self.hparams.optimizer.class_name)(
                 params, **self.hparams.optimizer.params)
                 )
-        # instantite schceduler
-        self.scheduler = (
-            load_obj(self.hparams.scheduler.class_name)(
-                self.optimizer, **self.hparams.scheduler.params)
-                )
-        # convert the scheduler to lightning format
-        if not self.hparams.scheduler.monitor:
-            self.scheduler = {
-                "scheduler": self.scheduler,
-                "interval": self.hparams.scheduler.interval,
-                "frequency": self.hparams.scheduler.frequency,
-            }
-        else:
-            self.scheduler = {
-                "scheduler": self.scheduler,
-                "interval": self.hparams.scheduler.interval,
-                "frequency": self.hparams.scheduler.frequency,
-                "monitor": self.hparams.scheduler.monitor,
-            }
-
-        # log optimizer and scheduler
+        
         self.fancy_logger.info(f"OPTIMIZER_NAME : {self.optimizer.__class__.__name__}")
         self.fancy_logger.info(f"LEARNING_RATE: {self.hparams.optimizer.params.lr}")
         self.fancy_logger.info(f"WEIGHT_DECAY: {self.hparams.optimizer.params.weight_decay}")
-        self.fancy_logger.info(f"LR_SCHEDULER_NAME : {self.scheduler['scheduler'].__class__.__name__}")
-        return [self.optimizer], [self.scheduler]
+        
+        # instantite schceduler if hprams.scheduler is not None
+        if self.hparams.self.hparams.scheduler.class_name is None:
+            # return only the optimizer if scheduler class_name is None
+            return [self.optimizer]
+        
+        # else load in the scheduler
+        else:    
+            self.scheduler = (
+                load_obj(self.hparams.scheduler.class_name)(
+                    self.optimizer, **self.hparams.scheduler.params)
+                    )
+            # convert the scheduler to lightning format
+            if not self.hparams.scheduler.monitor:
+                self.scheduler = {
+                    "scheduler": self.scheduler,
+                    "interval": self.hparams.scheduler.interval,
+                    "frequency": self.hparams.scheduler.frequency,
+                }
+            else:
+                self.scheduler = {
+                    "scheduler": self.scheduler,
+                    "interval": self.hparams.scheduler.interval,
+                    "frequency": self.hparams.scheduler.frequency,
+                    "monitor": self.hparams.scheduler.monitor,
+                }
+
+            self.fancy_logger.info(f"LR_SCHEDULER_NAME : {self.scheduler['scheduler'].__class__.__name__}")
+            
+            return [self.optimizer], [self.scheduler]
+
+    def optimizer_step(self, current_epoch, batch_nb, optimizer, *args, **kwargs):
+        # learning rate warm-up: if hparams.lr_warmup.use = True 
+        # add learning rate warm-up
+        if self.hparams.lr_warmup.use :
+            # warm up lr
+            if self.trainer.global_step < self.hparams.lr_warmup.steps:
+                lr_scale = min(1., float(self.trainer.global_step + 1) / 500.)
+                for pg in optimizer.param_groups:
+                    pg['lr'] = lr_scale * self.hparams.optimizer.params.lr
+        
+        # update parameters
+        optimizer.step()
+        optimizer.zero_grad()
+
 
     def train_dataloader(self, *args, **kwargs):
         bs = self.hparams.dataloader.train_bs
@@ -187,10 +210,14 @@ class RetinaNetModel(pl.LightningModule):
         # instantiate coco_api to track metrics
         prompt = "Converting dataset annotations in 'test_dataset' to COCO format for inference ..."
         self.fancy_logger.info(prompt)
+        # convert test dataset to coco-format 
+        # to evaluate using COCO-API
         coco = get_coco_api_from_dataset(loader.dataset)
         self.test_evaluator = CocoEvaluator(coco, ["bbox"])
+        
         prompt = f"Conversion finished, num images: {loader.dataset.__len__()}"
         self.fancy_logger.info(prompt)
+        
         return loader
 
     # Training step : 
@@ -268,9 +295,7 @@ class LogCallback(pl.Callback):
 
     def on_test_start(self, trainer, pl_module):
         self.test_start = datetime.datetime.now().replace(microsecond=0)
-        prompt = (
-            f"Start Inference on {pl_module.test_dataloader().dataset.__len__()} images"
-        )
+        prompt = (f"Start Inference on {pl_module.test_dataloader().dataset.__len__()} images")
         pl_module.fancy_logger.info(prompt)
 
     def on_test_end(self, trainer, pl_module):

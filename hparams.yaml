@@ -70,12 +70,14 @@ optimizer:
 
 # NOTE: for the format of the scheduler supported in pytorch lightning
 # check : https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+# set scheduler.class_name == None to not use any schduler
 scheduler:
   class_name: torch.optim.lr_scheduler.ReduceLROnPlateau
   params:
     mode: min
     factor: 0.1
-    patience: 8
+    patience: 5
+    verbose: true
 
   # this parameters determines how many times a schdeuler should be
   # called at each scheduling step.
@@ -89,3 +91,8 @@ scheduler:
   # this parameteris required for schdulers the scheduler the
   # learning_rate based on a value
   monitor: val_loss
+
+#wether to use learning rate warmup-or not
+lr_warmup:
+  use: false
+  steps: 800 # no.of steps to reach the learning_rate
