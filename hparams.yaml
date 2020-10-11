@@ -94,8 +94,8 @@ scheduler:
   # this parameteris required for schdulers the scheduler the
   # learning_rate based on a value
   monitor: val_loss
-
-#wether to use learning rate warmup-or not
-lr_warmup:
-  use: false
-  steps: 800 # no.of steps to reach the learning_rate
+# TO-DO: ADD OPTION FOR LR_WARMUP
+# #wether to use learning rate warmup-or not
+# lr_warmup:
+#   use: false
+#   steps: 800 # no.of steps to reach the learning_rate
