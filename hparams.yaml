@@ -73,19 +73,22 @@ optimizer:
 # set scheduler.class_name == None to not use any schduler
 scheduler:
   class_name: torch.optim.lr_scheduler.ReduceLROnPlateau
+  # parameters for the scheduler
   params:
     mode: min
     factor: 0.1
     patience: 5
     verbose: true
 
-  # this parameters determines how many times a schdeuler should be
-  # called at each scheduling step.
-  interval: 1
   # can be one of epoch or step
   # this parameter determines when the scheduler scheduler be called
   # after each epoch or after each batch (i.e, step)
-  frequency: epoch
+  interval: epoch
+
+  # this parameters determines how many times a schdeuler should be
+  # called at each scheduling step.
+  frequency: 1
+
   # if monitor parameter is not required set this to be `false`
   # if set this parameters monitors the `val_loss` of the model
   # this parameteris required for schdulers the scheduler the
