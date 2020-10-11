@@ -97,7 +97,9 @@ class Retinanet(nn.Module):
         pretrained = ifnone(pretrained, PRETRAINED_BACKBONE)
         nms_thres = ifnone(nms_thres, NMS_THRES)
         score_thres = ifnone(score_thres, SCORE_THRES)
-        max_detections_per_images = ifnone(max_detections_per_images, MAX_DETECTIONS_PER_IMAGE)
+        max_detections_per_images = ifnone(
+            max_detections_per_images, MAX_DETECTIONS_PER_IMAGE
+        )
         freeze_bn = ifnone(freeze_bn, FREEZE_BN)
         min_size = ifnone(min_size, MIN_IMAGE_SIZE)
         max_size = ifnone(max_size, MAX_IMAGE_SIZE)
@@ -113,7 +115,9 @@ class Retinanet(nn.Module):
 
         # Instantiate modules for RetinaNet
         self.backbone_kind = backbone_kind
-        self.transform = GeneralizedRCNNTransform(min_size, max_size, image_mean, image_std)
+        self.transform = GeneralizedRCNNTransform(
+            min_size, max_size, image_mean, image_std
+        )
         self.backbone = get_backbone(backbone_kind, pretrained, freeze_bn=freeze_bn)
         fpn_szs = self._get_backbone_ouputs()
         self.fpn = FeaturePyramid(fpn_szs[0], fpn_szs[1], fpn_szs[2], 256)
@@ -181,7 +185,7 @@ class Retinanet(nn.Module):
         for bb_per_im, sc_per_im, ancs_per_im, im_sz, lbl_per_im in zip(
             bboxes, scores, anchors, im_szs, labels
         ):
-            all_boxes  = []
+            all_boxes = []
             all_scores = []
             all_labels = []
             # convert the activation i.e, outputs of the model to bounding boxes
@@ -220,17 +224,17 @@ class Retinanet(nn.Module):
                 all_labels.append(lbl_per_cls)
 
             # Convert to tensors
-            all_boxes  = torch.cat(all_boxes, dim=0)
+            all_boxes = torch.cat(all_boxes, dim=0)
             all_scores = torch.cat(all_scores, dim=0)
             all_labels = torch.cat(all_labels, dim=0)
-            
+
             # model is going to predict classes which are going to be in the range of [0, num_classes]
-            # 0 is reserved for the background class for which no loss is calculate , so 
+            # 0 is reserved for the background class for which no loss is calculate , so
             # we will add 1 to all the class_predictions to shift the predicitons range from
             # [0, num_classes) -> [1, num_classes]
-            all_labels = all_labels + 1 
-            
-            # Sort by scores and 
+            all_labels = all_labels + 1
+
+            # Sort by scores and
             # Grab the idxs from the corresponding to the topk predictions
             _, topk_idxs = all_scores.sort(descending=True)
             topk_idxs = topk_idxs[: self.detections_per_img]
@@ -240,7 +244,9 @@ class Retinanet(nn.Module):
                 all_labels[topk_idxs],
             )
 
-            detections.append({"boxes": all_boxes, "scores": all_scores, "labels": all_labels,})
+            detections.append(
+                {"boxes": all_boxes, "scores": all_scores, "labels": all_labels,}
+            )
         return detections
 
     def predict(self, images: List[Tensor]) -> List[Dict[str, Tensor]]:
@@ -269,9 +275,7 @@ class Retinanet(nn.Module):
         detections = self.transform.postprocess(detections, images.image_sizes, orig_im_szs)
         return detections
 
-    def forward(
-        self, images: List[Tensor], targets: Optional[List[Dict[str, Tensor]]]
-    ) -> Dict[str, Tensor]:
+    def forward(self, images: List[Tensor], targets: Optional[List[Dict[str, Tensor]]]) -> Dict[str, Tensor]:
         """
         Computes the loss of the model
         """
