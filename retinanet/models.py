@@ -115,9 +115,7 @@ class Retinanet(nn.Module):
 
         # Instantiate modules for RetinaNet
         self.backbone_kind = backbone_kind
-        self.transform = GeneralizedRCNNTransform(
-            min_size, max_size, image_mean, image_std
-        )
+        self.transform = GeneralizedRCNNTransform(min_size, max_size, image_mean, image_std)
         self.backbone = get_backbone(backbone_kind, pretrained, freeze_bn=freeze_bn)
         fpn_szs = self._get_backbone_ouputs()
         self.fpn = FeaturePyramid(fpn_szs[0], fpn_szs[1], fpn_szs[2], 256)
@@ -126,10 +124,10 @@ class Retinanet(nn.Module):
         self.retinanet_head = RetinaNetHead(256, 256, num_anchors, num_classes, prior)
 
         # Parameters for detection
-        self.score_thres = score_thres
-        self.nms_thres = nms_thres
+        self.score_thres        = score_thres
+        self.nms_thres          = nms_thres
         self.detections_per_img = max_detections_per_images
-        self.num_classes = num_classes
+        self.num_classes        = num_classes
 
         # Log some information
         logger.info(f"BACKBONE : {backbone_kind}")
@@ -182,9 +180,8 @@ class Retinanet(nn.Module):
 
         detections = torch.jit.annotate(List[Dict[str, Tensor]], [])
 
-        for bb_per_im, sc_per_im, ancs_per_im, im_sz, lbl_per_im in zip(
-            bboxes, scores, anchors, im_szs, labels
-        ):
+        for bb_per_im, sc_per_im, ancs_per_im, im_sz, lbl_per_im in zip(bboxes, scores, anchors, im_szs, labels):
+            
             all_boxes = []
             all_scores = []
             all_labels = []
@@ -244,36 +241,35 @@ class Retinanet(nn.Module):
                 all_labels[topk_idxs],
             )
 
-            detections.append(
-                {"boxes": all_boxes, "scores": all_scores, "labels": all_labels,}
-            )
+            detections.append({"boxes": all_boxes, "scores": all_scores, "labels": all_labels,})
         return detections
 
     def predict(self, images: List[Tensor]) -> List[Dict[str, Tensor]]:
         """
         Computs predictions for the given model
         """
+        #set model to eval
+        self.training = False
         targets = None
-        orig_im_szs = []
-        # Store original images sizes used to resict the images
-        for im in images:
-            val = im.shape[-2:]
-            assert len(val) == 2
-            orig_im_szs.append((val[0], val[1]))
 
+        # get the original image sizes
+        original_image_sizes = torch.jit.annotate(List[Tuple[int, int]], [])
+        for img in images:
+            val = img.shape[-2:]
+            assert len(val) == 2
+            original_image_sizes.append((val[0], val[1]))
+        
         # Foward pass of the Model
         images, targets = self.transform(images, targets)
-        feature_maps = self.backbone(images.tensors)
-        feature_maps = self.fpn(feature_maps)
-        outputs = self.retinanet_head(feature_maps)
-        # Generate anchors for the images
-        anchors = self.anchor_generator(images, feature_maps)
-        # store detections
-        detections = torch.jit.annotate(List[Dict[str, Tensor]], [])
-        # computes detections from the given model
-        detections = self.process_detections(outputs, anchors, images.image_sizes)
-        detections = self.transform.postprocess(detections, images.image_sizes, orig_im_szs)
-        return detections
+        feature_maps    = self.backbone(images.tensors)
+        feature_maps    = self.fpn(feature_maps)
+        outputs         = self.retinanet_head(feature_maps)
+        anchors         = self.anchor_generator(images, feature_maps)
+        
+        detections       = torch.jit.annotate(List[Dict[str, Tensor]], [])
+        detections       = self.process_detections(outputs, anchors, images.image_sizes)
+        final_detections = self.transform.postprocess(detections, images.image_sizes, original_image_sizes)
+        return final_detections
 
     def forward(self, images: List[Tensor], targets: Optional[List[Dict[str, Tensor]]]) -> Dict[str, Tensor]:
         """
@@ -281,11 +277,11 @@ class Retinanet(nn.Module):
         """
         # Foward pass of the Model
         images, targets = self.transform(images, targets)
-        feature_maps = self.backbone(images.tensors)
-        feature_maps = self.fpn(feature_maps)
-        outputs = self.retinanet_head(feature_maps)
+        feature_maps    = self.backbone(images.tensors)
+        feature_maps    = self.fpn(feature_maps)
+        outputs         = self.retinanet_head(feature_maps)
         # Generate anchors for the images
-        anchors = self.anchor_generator(images, feature_maps)
+        anchors         = self.anchor_generator(images, feature_maps)
         # store losses
         losses = {}
         losses = self.compute_loss(targets, outputs, anchors)
