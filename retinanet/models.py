@@ -97,9 +97,7 @@ class Retinanet(nn.Module):
         pretrained = ifnone(pretrained, PRETRAINED_BACKBONE)
         nms_thres = ifnone(nms_thres, NMS_THRES)
         score_thres = ifnone(score_thres, SCORE_THRES)
-        max_detections_per_images = ifnone(
-            max_detections_per_images, MAX_DETECTIONS_PER_IMAGE
-        )
+        max_detections_per_images = ifnone(max_detections_per_images, MAX_DETECTIONS_PER_IMAGE)
         freeze_bn = ifnone(freeze_bn, FREEZE_BN)
         min_size = ifnone(min_size, MIN_IMAGE_SIZE)
         max_size = ifnone(max_size, MAX_IMAGE_SIZE)
@@ -130,9 +128,9 @@ class Retinanet(nn.Module):
         self.num_classes        = num_classes
 
         # Log some information
-        logger.info(f"BACKBONE : {backbone_kind}")
-        logger.info(f"INPUT PARAMS : MAX_SIZE={max_size}, MIN_SIZE={min_size}")
-        logger.info(f"NUM CLASSES : {self.num_classes}")
+        logger.info(f"BACKBONE     : {backbone_kind}")
+        logger.info(f"INPUT_PARAMS : MAX_SIZE={max_size}, MIN_SIZE={min_size}")
+        logger.info(f"NUM_CLASSES  : {self.num_classes}")
 
     def _get_backbone_ouputs(self) -> List:
         if self.backbone_kind in __small__:
@@ -249,9 +247,10 @@ class Retinanet(nn.Module):
         Computs predictions for the given model
         """
         #set model to eval
-        self.training = False
+        if self.training :
+            self.training = False
+        
         targets = None
-
         # get the original image sizes
         original_image_sizes = torch.jit.annotate(List[Tuple[int, int]], [])
         for img in images:
