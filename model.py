@@ -154,26 +154,6 @@ class RetinaNetModel(pl.LightningModule):
             
             return [self.optimizer], [self.scheduler]
 
-    # def optimizer_step(self, current_epoch, batch_nb, optimizer, *args, **kwargs):
-    #     if self.hparams.lr_warmup.use :
-    #         # learning rate warm-up: if hparams.lr_warmup.use = True 
-    #         # add learning rate warm-up
-    #         # warm up lr
-    #         if self.trainer.global_step < self.hparams.lr_warmup.steps:
-    #             lr_scale = min(1., float(self.trainer.global_step + 1) / self.hparams.lr_warmup.steps)
-    #             for pg in optimizer.param_groups:
-    #                 pg['lr'] = lr_scale * self.hparams.optimizer.params.lr
-        
-    #         # update parameters
-    #         optimizer.step()
-    #         optimizer.zero_grad()
-
-    #     else:
-    #         # update parameters
-    #         optimizer.step()
-    #         optimizer.zero_grad()
-
-
     def train_dataloader(self, *args, **kwargs):
         bs = self.hparams.dataloader.train_bs
         # instantiate train dataloader

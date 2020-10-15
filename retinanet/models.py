@@ -244,7 +244,7 @@ class Retinanet(nn.Module):
 
     def predict(self, images: List[Tensor]) -> List[Dict[str, Tensor]]:
         """
-        Computs predictions for the given model
+        Computes predictions for the given model
         """
         #set model to eval
         if self.training :
@@ -252,7 +252,7 @@ class Retinanet(nn.Module):
         
         targets = None
         # get the original image sizes
-        original_image_sizes = torch.jit.annotate(List[Tuple[int, int]], [])
+        original_image_sizes = []
         for img in images:
             val = img.shape[-2:]
             assert len(val) == 2
@@ -266,6 +266,7 @@ class Retinanet(nn.Module):
         anchors         = self.anchor_generator(images, feature_maps)
         
         detections       = torch.jit.annotate(List[Dict[str, Tensor]], [])
+        #compute the detections
         detections       = self.process_detections(outputs, anchors, images.image_sizes)
         final_detections = self.transform.postprocess(detections, images.image_sizes, original_image_sizes)
         return final_detections
