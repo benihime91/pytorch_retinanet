@@ -1,5 +1,4 @@
 import datetime
-from utils import logger
 
 import pytorch_lightning as pl
 import torch
