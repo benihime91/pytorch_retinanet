@@ -6,13 +6,13 @@
 # RETINANET MODEL PARAMETERS
 # ============================================================== #
 # set the parameters to be passed on to the retianet mode here
-# NOTE: the full set of arguemnts can be found in `retinanet/config.py` .
+# NOTE: the full set of arguments can be found in `retinanet/config.py` .
 model:
   backbone_kind: resnet50 # backbone of the model
   num_classes: 90 # number of classes (excluding the background class)
-  freeze_bn: True # wether to freeze the backone of the model
+  freeze_bn: true # wether to freeze the backone of the model
   min_size: 800 # Size of the smallest side of the image during training
-  max_size: 1600 # Maximum size of the side of the image during training
+  max_size: 1600 #Size of the Maximum size of the image during training
 
 # ============================================================== #
 # DATASETS AND DATALOADERS :
@@ -42,7 +42,7 @@ dataloader:
   args:
     # extra arguments to be passed to the dataloaders
     num_workers: 0
-    pin_memory: True
+    pin_memory: true
 
 # =========================================================================
 # Albumentation transformations to use for the pascal or csv dataset
