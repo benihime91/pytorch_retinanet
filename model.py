@@ -16,6 +16,8 @@ from utils.coco.coco_transforms import Compose, RandomHorizontalFlip, ToTensor
 from utils.pascal import get_pascal, PascalDataset
 from utils.pascal.pascal_transforms import compose_transforms
 
+import logging
+
 
 def _get_model(hparams: DictConfig, **kwargs):
     model = Retinanet(**hparams.model, **kwargs)
@@ -35,7 +37,7 @@ class RetinaNetModel(pl.LightningModule):
         super(RetinaNetModel, self).__init__()
         self.hparams = hparams
         # load model using model hparams
-        self.fancy_logger = _get_logger(__name__)
+        self.fancy_logger = logging.getLogger(__name__)
         self.model = _get_model(self.hparams, logger=self.fancy_logger)
 
     def forward(self, xb, *args, **kwargs):
