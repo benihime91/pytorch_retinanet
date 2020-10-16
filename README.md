@@ -83,8 +83,8 @@ This is controlled via the `dataset.kind` parameter in `hparams.yaml`.
 
 2. If the dataset is in Pascal-VOC format :
    * set  `dataset.kind` = "pascal"
-   * set `data.trn_paths` = [path_to_annotations, path_to_images]
-   * similarly set the paths for valiation and test, test paths are optional. The dataset from the test paths is used to perform COCO-API-evaluation . If no test paths are given then COCO-API-evaluation is instead done on the datasdet generated from val_paths
+   * set  `data.trn_paths` = [path_to_annotations, path_to_images]
+   * similarly set the paths for valiation and test datasets
 
    ```yaml
    dataset:
@@ -114,12 +114,23 @@ This is controlled via the `dataset.kind` parameter in `hparams.yaml`.
    * **`class`** : class label for the particular annotation
    * **`labels`** : integer labels for the particular annotation
    * **`xmin`**, **`ymin`**, **`xmax`**, **`ymax`**: absolute bounding-box co-ordinates
+  
+   ```yaml
+   dataset:
+      kind: csv
+      trn_paths: "train_data.csv"
+      val_paths: "val_data.csv" #This is Optional
+      test_paths: "test_data.csv" 
+   ```
 
-   Note : 
-   - each entry in the csv file should corresponding to a unique bounding-box.
+### Note : 
+   - if validation dataset is not present set *hparams.dataset.val_paths = False.*
+   - the model computes the COCO-API evaluation metrics on the test dataset.
+   - for csv dataset each entry in the csv file should corresponding to a unique bounding-box.
    - labels should start from 1 as the 0th label is reserved for "__background__" class.
-   - to generate a `LABEL_MAP` to be used for visulazation purposes:
-    ```python
+   - to generate a LABEL_MAP to be used for visulazation purposes:
+
+   ```python
     from utils.pascal import generate_pascal_category_names
     import pandas as pd
     
@@ -127,22 +138,14 @@ This is controlled via the `dataset.kind` parameter in `hparams.yaml`.
     df = pd.read_csv(path)
     
     # Generate a label map
-    LABEL_MAP = generate_pascal_category_names(df)
-    ```
-
-   ```yaml
-   dataset:
-      kind: csv
-      trn_paths: "train_data.csv"
-      val_paths: "val_data.csv"
-      test_paths: "test_data.csv" # this is Optional
+    LABEL_MAP = generate_pascal_category_names(df) 
    ```
-
+    
 
 ## Visualizing the bounding-box(s) over the image :
 
    ```python
-   from utils import visualize_boxes_and_labels_on_image_array
+   from utils import visualize_boxes_and_labels_on_image_array as vis_bbs
    from PIL import Image
    import cv2
    import numpy as np
@@ -172,20 +175,16 @@ This is controlled via the `dataset.kind` parameter in `hparams.yaml`.
    scores = ...
 
    # draw bounding-box over the loaded image
-   im = visualize_boxes_and_labels_on_image_array(image,
-                                                  boxes,
-                                                  labels,
-                                                  scores,
-                                                  LABEL_MAP
-                                                  )
+   im = vis_bbs(image, boxes, labels, scores, LABEL_MAP)
    # this function returns a PIL image instance 
    # to view the image
    im.show()
    # or in jupyter-notebooks use : im
+   
    ```
 
 ## References : 
-```bash
+```
 https://arxiv.org/abs/1708.02002
 https://github.com/facebookresearch/detectron2
 https://github.com/pytorch/vision

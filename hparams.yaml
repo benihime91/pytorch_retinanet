@@ -1,6 +1,6 @@
-###################################################################
+# ================================================================= #
 # CONFIG FILE TO INSTANTIATE THE LIGHTNING MODEL :
-###################################################################
+# ================================================================= #
 
 # ============================================================== #
 # RETINANET MODEL PARAMETERS
@@ -21,13 +21,11 @@ model:
 # as described in the the README.md file
 # set the type of dataset that is to be used in the `kind` argument.
 
-# NOTE: test_paths is Optional but valid_paths, trn_paths is required for
+# NOTE: valid_paths is Optional but test_paths, trn_paths is required for
 # "pascal" and "csv" dataset.
 
-# NOTE: if validation data is not available then set the `valid_paths` arguemnt
-# to point to the test data and set `test_paths` to be false, this will then use
-# the validation data as both the test and validiton data, 1.e.,
-# validtion loss and COCO-API results will be computed in the same dastaset
+# NOTE: if validation data is not available then set the `valid_paths` argument
+# to be false this will then use
 dataset:
   kind: false
   root_dir: false
@@ -73,29 +71,20 @@ optimizer:
 # set scheduler.class_name == None to not use any schduler
 scheduler:
   class_name: torch.optim.lr_scheduler.ReduceLROnPlateau
-  # parameters for the scheduler
   params:
     mode: min
     factor: 0.1
     patience: 5
     verbose: true
-
   # can be one of epoch or step
   # this parameter determines when the scheduler scheduler be called
   # after each epoch or after each batch (i.e, step)
   interval: epoch
-
   # this parameters determines how many times a schdeuler should be
   # called at each scheduling step.
   frequency: 1
-
   # if monitor parameter is not required set this to be `false`
   # if set this parameters monitors the `val_loss` of the model
   # this parameteris required for schdulers the scheduler the
   # learning_rate based on a value
   monitor: val_loss
-# TO-DO: ADD OPTION FOR LR_WARMUP
-# #wether to use learning rate warmup-or not
-# lr_warmup:
-#   use: false
-#   steps: 800 # no.of steps to reach the learning_rate
