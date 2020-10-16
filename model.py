@@ -16,8 +16,6 @@ from utils.coco.coco_transforms import Compose, RandomHorizontalFlip, ToTensor
 from utils.pascal import get_pascal, PascalDataset
 from utils.pascal.pascal_transforms import compose_transforms
 
-import logging
-logging.getLogger("lightning").setLevel(logging.ERROR)
 
 def _get_model(hparams: DictConfig, **kwargs):
     model = Retinanet(**hparams.model, **kwargs)
