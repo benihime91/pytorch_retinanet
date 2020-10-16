@@ -90,13 +90,22 @@ This is controlled via the `dataset.kind` parameter in `hparams.yaml`.
    dataset:
       kind: pascal
       trn_paths:
-         - "/content/pascal_voc_2007_train_val/Annotations/"
-         - /content/pascal_voc_2007_train_val/Images/"
+         - /content/data_train/Annotations/
+         - /content/data_train/Images/"
+      test_paths:
+         - /content/data_test/Annotations/"
+         - /content/data_test/Images/"
       val_paths:
-         - /content/pascal_voc_2007_test/Annotations/"
-         - /content/pascal_voc_2007_test/Images/"
-      test_paths: false
+         - /content/data_validation/Annotations/"
+         - /content/data_validation/Images/"
    ```
+   Note: 
+      * image and annotation folder can be the same folder.
+      * *val_paths* if optional, if no validation data then set , 
+  
+      ```yaml
+      val_paths: False
+      ```
 
 3. The datasets can also be loaded from a csv format. The csv file should be as follows :
    ```
