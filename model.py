@@ -92,7 +92,7 @@ class RetinaNetModel(pl.LightningModule):
                     "scheduler": __scheduler,
                     "interval": schedps.interval,
                     "frequency": schedps.frequency,
-                    "monitor": schedps.scheduler.monitor,
+                    "monitor": schedps.monitor,
                 }
 
             return [self.optimizer], [self.scheduler]
