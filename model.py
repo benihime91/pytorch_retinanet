@@ -27,8 +27,8 @@ class RetinaNetModel(pl.LightningModule):
         self.net = Retinanet(**hparams.model)
 
     def forward(self, xb, *args, **kwargs):
-         output = self.net(xb)
-         return output
+        output = self.net(xb)
+        return output
 
     def prepare_data(self):
         """
@@ -39,27 +39,52 @@ class RetinaNetModel(pl.LightningModule):
         if data_params.kind == "coco":
             trn_tfms = Compose([ToTensor(), RandomHorizontalFlip(prob=0.5)])
             val_tfms = Compose([ToTensor()])
-            
-            self.trn_ds = get_coco(root=data_params.root_dir, image_set="train", transforms=trn_tfms)
+
+            self.trn_ds = get_coco(
+                root=data_params.root_dir, image_set="train", transforms=trn_tfms
+            )
             self.val_ds = None
-            self.test_ds = get_coco(root=data_params.root_dir, image_set="val", transforms=val_tfms)
+            self.test_ds = get_coco(
+                root=data_params.root_dir, image_set="val", transforms=val_tfms
+            )
 
         elif data_params.kind == "pascal":
-            trn_tfms = [load_obj(i["class_name"])(**i["params"]) for i in self.hparams.transforms]
+            trn_tfms = [
+                load_obj(i["class_name"])(**i["params"])
+                for i in self.hparams.transforms
+            ]
             trn_tfms = compose_transforms(trn_tfms)
             test_tfms = compose_transforms()
-            
-            self.trn_ds = get_pascal(data_params.trn_paths[0], data_params.trn_paths[1], "train", transforms=trn_tfms,)
-            
+
+            self.trn_ds = get_pascal(
+                data_params.trn_paths[0],
+                data_params.trn_paths[1],
+                "train",
+                transforms=trn_tfms,
+            )
+
             if data_params.valid_paths:
-                self.val_ds = get_pascal(data_params.valid_paths[0], data_params.valid_paths[1], "test", transforms=test_tfms,)
+                self.val_ds = get_pascal(
+                    data_params.valid_paths[0],
+                    data_params.valid_paths[1],
+                    "test",
+                    transforms=test_tfms,
+                )
             else:
                 self.val_ds = None
-            
-            self.test_ds = get_pascal(data_params.test_paths[0], data_params.test_paths[1], "test", transforms=test_tfms,)
+
+            self.test_ds = get_pascal(
+                data_params.test_paths[0],
+                data_params.test_paths[1],
+                "test",
+                transforms=test_tfms,
+            )
 
         elif data_params.kind == "csv":
-            trn_tfms = [load_obj(i["class_name"])(**i["params"]) for i in self.hparams.transforms]
+            trn_tfms = [
+                load_obj(i["class_name"])(**i["params"])
+                for i in self.hparams.transforms
+            ]
             trn_tfms = compose_transforms(trn_tfms)
             test_tfms = compose_transforms()
             self.trn_ds = PascalDataset(data_params.trn_paths, trn_tfms)
@@ -74,34 +99,42 @@ class RetinaNetModel(pl.LightningModule):
 
     def configure_optimizers(self, *args, **kwargs):
         opt = self.hparams.optimizer.class_name
-        self.optimizer = load_obj(opt)(self.net.parameters(), **self.hparams.optimizer.params)
-        
+        self.optimizer = load_obj(opt)(
+            self.net.parameters(), **self.hparams.optimizer.params
+        )
+
         if self.hparams.scheduler.class_name is None:
             return [self.optimizer]
 
         else:
             schedps = self.hparams.scheduler
             __scheduler = load_obj(schedps.class_name)(self.optimizer, **schedps.params)
-            
+
             if not self.hparams.scheduler.monitor:
                 self.scheduler = {
-                    "scheduler": __scheduler, 
-                    "interval": schedps.interval, 
+                    "scheduler": __scheduler,
+                    "interval": schedps.interval,
                     "frequency": schedps.frequency,
-                    }
+                }
             else:
                 self.scheduler = {
-                    "scheduler": __scheduler, 
-                    "interval": schedps.interval, 
+                    "scheduler": __scheduler,
+                    "interval": schedps.interval,
                     "frequency": schedps.frequency,
                     "monitor": schedps.scheduler.monitor,
-                    }
+                }
 
             return [self.optimizer], [self.scheduler]
 
     def train_dataloader(self, *args, **kwargs):
         bs = self.hparams.dataloader.train_bs
-        loader = DataLoader(self.trn_ds, bs, shuffle=True, collate_fn=collate_fn,**self.hparams.dataloader.args,)
+        loader = DataLoader(
+            self.trn_ds,
+            bs,
+            shuffle=True,
+            collate_fn=collate_fn,
+            **self.hparams.dataloader.args,
+        )
         return loader
 
     def val_dataloader(self, *args, **kwargs):
@@ -109,12 +142,16 @@ class RetinaNetModel(pl.LightningModule):
             return None
         else:
             bs = self.hparams.dataloader.valid_bs
-            loader = DataLoader(self.val_ds, bs, collate_fn=collate_fn, **self.hparams.dataloader.args)
+            loader = DataLoader(
+                self.val_ds, bs, collate_fn=collate_fn, **self.hparams.dataloader.args
+            )
             return loader
 
     def test_dataloader(self, *args, **kwargs):
         bs = self.hparams.dataloader.test_bs
-        loader = DataLoader(self.test_ds, bs, collate_fn=collate_fn, **self.hparams.dataloader.args)
+        loader = DataLoader(
+            self.test_ds, bs, collate_fn=collate_fn, **self.hparams.dataloader.args
+        )
         coco = get_coco_api_from_dataset(loader.dataset)
         self.test_evaluator = CocoEvaluator(coco, ["bbox"])
         return loader
@@ -137,7 +174,11 @@ class RetinaNetModel(pl.LightningModule):
         loss = sum(loss for loss in loss_dict.values())
         loss = torch.as_tensor(loss)
         logs = {"val_loss": loss}
-        return {"val_loss": loss, "log": logs, "progress_bar": logs,}
+        return {
+            "val_loss": loss,
+            "log": logs,
+            "progress_bar": logs,
+        }
 
     def test_step(self, batch, batch_idx, *args, **kwargs):
         images, targets, _ = batch
@@ -153,4 +194,9 @@ class RetinaNetModel(pl.LightningModule):
         metric = self.test_evaluator.coco_eval["bbox"].stats[0]
         metric = torch.as_tensor(metric)
         logs = {"AP": metric}
-        return {"AP": metric, "log": logs, "progress_bar": logs,}
+        return {
+            "AP": metric,
+            "log": logs,
+            "progress_bar": logs,
+        }
+
