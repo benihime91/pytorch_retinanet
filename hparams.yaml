@@ -13,6 +13,7 @@ model:
   freeze_bn: true # wether to freeze the backone of the model
   min_size: 800 # Size of the smallest side of the image during training
   max_size: 1600 #Size of the Maximum size of the image during training
+  pretrained: true #Loads in pretrained-imagenet weights for backbone
 
 # ============================================================== #
 # DATASETS AND DATALOADERS :
@@ -76,15 +77,6 @@ scheduler:
     factor: 0.1
     patience: 5
     verbose: true
-  # can be one of epoch or step
-  # this parameter determines when the scheduler scheduler be called
-  # after each epoch or after each batch (i.e, step)
-  interval: epoch
-  # this parameters determines how many times a schdeuler should be
-  # called at each scheduling step.
+  interval: epoch # (or step)
   frequency: 1
-  # if monitor parameter is not required set this to be `false`
-  # if set this parameters monitors the `val_loss` of the model
-  # this parameteris required for schdulers the scheduler the
-  # learning_rate based on a value
-  monitor: val_loss
+  monitor: val_loss # (or false)

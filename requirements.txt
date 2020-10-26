@@ -1,6 +1,6 @@
 torch==1.6.0
 torchvision==0.7.0
-pytorch-lightning
+pytorch-lightning==1.0.3
 pycocotools==2.0.1
 albumentations==0.4.6
 matplotlib==3.2.2
