@@ -39,20 +39,12 @@ class RetinaNetModel(pl.LightningModule):
         if data_params.kind == "coco":
             trn_tfms = Compose([ToTensor(), RandomHorizontalFlip(prob=0.5)])
             val_tfms = Compose([ToTensor()])
-
-            self.trn_ds = get_coco(
-                root=data_params.root_dir, image_set="train", transforms=trn_tfms
-            )
+            self.trn_ds = get_coco(root=data_params.root_dir, image_set="train", transforms=trn_tfms)
             self.val_ds = None
-            self.test_ds = get_coco(
-                root=data_params.root_dir, image_set="val", transforms=val_tfms
-            )
+            self.test_ds = get_coco(root=data_params.root_dir, image_set="val", transforms=val_tfms)
 
         elif data_params.kind == "pascal":
-            trn_tfms = [
-                load_obj(i["class_name"])(**i["params"])
-                for i in self.hparams.transforms
-            ]
+            trn_tfms = [load_obj(i["class_name"])(**i["params"]) for i in self.hparams.transforms]
             trn_tfms = compose_transforms(trn_tfms)
             test_tfms = compose_transforms()
 
@@ -81,10 +73,7 @@ class RetinaNetModel(pl.LightningModule):
             )
 
         elif data_params.kind == "csv":
-            trn_tfms = [
-                load_obj(i["class_name"])(**i["params"])
-                for i in self.hparams.transforms
-            ]
+            trn_tfms = [load_obj(i["class_name"])(**i["params"])for i in self.hparams.transforms]
             trn_tfms = compose_transforms(trn_tfms)
             test_tfms = compose_transforms()
             self.trn_ds = PascalDataset(data_params.trn_paths, trn_tfms)
@@ -99,9 +88,7 @@ class RetinaNetModel(pl.LightningModule):
 
     def configure_optimizers(self, *args, **kwargs):
         opt = self.hparams.optimizer.class_name
-        self.optimizer = load_obj(opt)(
-            self.net.parameters(), **self.hparams.optimizer.params
-        )
+        self.optimizer = load_obj(opt)(self.net.parameters(), **self.hparams.optimizer.params)
 
         if self.hparams.scheduler.class_name is None:
             return [self.optimizer]
@@ -128,13 +115,7 @@ class RetinaNetModel(pl.LightningModule):
 
     def train_dataloader(self, *args, **kwargs):
         bs = self.hparams.dataloader.train_bs
-        loader = DataLoader(
-            self.trn_ds,
-            bs,
-            shuffle=True,
-            collate_fn=collate_fn,
-            **self.hparams.dataloader.args,
-        )
+        loader = DataLoader(self.trn_ds, bs, shuffle=True, collate_fn=collate_fn, **self.hparams.dataloader.args,)
         return loader
 
     def val_dataloader(self, *args, **kwargs):
@@ -142,16 +123,12 @@ class RetinaNetModel(pl.LightningModule):
             return None
         else:
             bs = self.hparams.dataloader.valid_bs
-            loader = DataLoader(
-                self.val_ds, bs, collate_fn=collate_fn, **self.hparams.dataloader.args
-            )
+            loader = DataLoader(self.val_ds, bs, collate_fn=collate_fn, **self.hparams.dataloader.args)
             return loader
 
     def test_dataloader(self, *args, **kwargs):
         bs = self.hparams.dataloader.test_bs
-        loader = DataLoader(
-            self.test_ds, bs, collate_fn=collate_fn, **self.hparams.dataloader.args
-        )
+        loader = DataLoader(self.test_ds, bs, collate_fn=collate_fn, **self.hparams.dataloader.args)
         coco = get_coco_api_from_dataset(loader.dataset)
         self.test_evaluator = CocoEvaluator(coco, ["bbox"])
         return loader
@@ -160,7 +137,7 @@ class RetinaNetModel(pl.LightningModule):
         images, targets, _ = batch  # unpack the one batch from the DataLoader
         targets = [{k: v for k, v in t.items()} for t in targets]  # Unpack the Targets
         # Calculate Losses {regression_loss , classification_loss}
-        loss_dict = self.model(images, targets)
+        loss_dict = self.net(images, targets)
         # Calculate Total Loss
         losses = sum(loss for loss in loss_dict.values())
         return {"loss": losses, "log": loss_dict, "progress_bar": loss_dict}
@@ -169,21 +146,17 @@ class RetinaNetModel(pl.LightningModule):
         images, targets, _ = batch  # unpack the one batch from the DataLoader
         targets = [{k: v for k, v in t.items()} for t in targets]  # Unpack the Targets
         # Calculate Losses {regression_loss , classification_loss}
-        loss_dict = self.model(images, targets)
+        loss_dict = self.net(images, targets)
         # Calculate Total Loss
         loss = sum(loss for loss in loss_dict.values())
         loss = torch.as_tensor(loss)
         logs = {"val_loss": loss}
-        return {
-            "val_loss": loss,
-            "log": logs,
-            "progress_bar": logs,
-        }
+        return {"val_loss": loss,"log": logs,"progress_bar": logs,}
 
     def test_step(self, batch, batch_idx, *args, **kwargs):
         images, targets, _ = batch
         targets = [{k: v for k, v in t.items()} for t in targets]
-        outputs = self.model.predict(images)
+        outputs = self.net.predict(images)
         res = {t["image_id"].item(): o for t, o in zip(targets, outputs)}
         self.test_evaluator.update(res)
         return {}
@@ -194,9 +167,5 @@ class RetinaNetModel(pl.LightningModule):
         metric = self.test_evaluator.coco_eval["bbox"].stats[0]
         metric = torch.as_tensor(metric)
         logs = {"AP": metric}
-        return {
-            "AP": metric,
-            "log": logs,
-            "progress_bar": logs,
-        }
+        return {"AP": metric,"log": logs,"progress_bar": logs,}
 
