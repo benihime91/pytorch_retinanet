@@ -11,7 +11,8 @@ The code is heavily influended by [Detectron2](https://github.com/facebookresear
 - [x] Assemble Retinanet Using `BackBone` => `FeaturePyramid` => `AnchorGenerator` => `Regeression` & `Classification`.
 
 ## Tutorials:
-- For a example training pipeline see : [demo.ipynb](https://github.com/benihime91/pytorch_retinanet/blob/master/demo.ipynb) .
+- <a href="https://colab.research.google.com/github/benihime91/pytorch_retinanet/blob/master/demo.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>  [demo.ipynb](https://github.com/benihime91/pytorch_retinanet/blob/master/demo.ipynb)
+  
 
 ## Usage:
    Clone the Github Repo
