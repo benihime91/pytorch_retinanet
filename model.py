@@ -10,6 +10,7 @@ from utils.pascal import get_pascal, PascalDataset
 from utils.pascal.pascal_transforms import compose_transforms
 from typing import Union
 import argparse
+import logging
 
 
 class RetinaNetModel(pl.LightningModule):
@@ -47,30 +48,13 @@ class RetinaNetModel(pl.LightningModule):
             trn_tfms = [load_obj(i["class_name"])(**i["params"]) for i in self.hparams.transforms]
             trn_tfms = compose_transforms(trn_tfms)
             test_tfms = compose_transforms()
-
-            self.trn_ds = get_pascal(
-                data_params.trn_paths[0],
-                data_params.trn_paths[1],
-                "train",
-                transforms=trn_tfms,
-            )
-
+            self.trn_ds = get_pascal(data_params.trn_paths[0], data_params.trn_paths[1], "train",transforms=trn_tfms,)
             if data_params.valid_paths:
-                self.val_ds = get_pascal(
-                    data_params.valid_paths[0],
-                    data_params.valid_paths[1],
-                    "test",
-                    transforms=test_tfms,
-                )
+                self.val_ds = get_pascal(data_params.valid_paths[0],data_params.valid_paths[1],"test",transforms=test_tfms,)
             else:
                 self.val_ds = None
 
-            self.test_ds = get_pascal(
-                data_params.test_paths[0],
-                data_params.test_paths[1],
-                "test",
-                transforms=test_tfms,
-            )
+            self.test_ds = get_pascal(data_params.test_paths[0],data_params.test_paths[1],"test",transforms=test_tfms,)
 
         elif data_params.kind == "csv":
             trn_tfms = [load_obj(i["class_name"])(**i["params"])for i in self.hparams.transforms]
@@ -89,7 +73,7 @@ class RetinaNetModel(pl.LightningModule):
     def configure_optimizers(self, *args, **kwargs):
         opt = self.hparams.optimizer.class_name
         self.optimizer = load_obj(opt)(self.net.parameters(), **self.hparams.optimizer.params)
-
+        
         if self.hparams.scheduler.class_name is None:
             return [self.optimizer]
 

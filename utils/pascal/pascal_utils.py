@@ -1,4 +1,5 @@
 import glob
+import logging
 import os
 import xml.etree.ElementTree as ET
 
@@ -8,9 +9,8 @@ import torch
 from sklearn.preprocessing import LabelEncoder
 from torch.utils.data import Dataset
 from torchvision import transforms
-from utils import _get_logger
 
-logger = _get_logger(__name__)
+logger = logging.getLogger(__name__)
 encoder = LabelEncoder()
 
 
