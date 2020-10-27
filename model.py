@@ -26,8 +26,11 @@ class RetinaNetModel(pl.LightningModule):
     def __init__(self, hparams: Union[DictConfig, argparse.Namespace]):
         super(RetinaNetModel, self).__init__()
         self.hparams = hparams
-        self.save_hyperparameters(hparams)
         self.net = Retinanet(**hparams.model)
+
+        #add learning_rate to hparams dictionary
+        self.hparams.learning_rate = self.hparams.optimizer.params.lr
+        self.save_hyperparameters(hparams)
 
     def forward(self, xb, *args, **kwargs):
         output = self.net(xb)
@@ -87,18 +90,6 @@ class RetinaNetModel(pl.LightningModule):
                 self.scheduler = {"scheduler": __scheduler,"interval": schedps.interval, "frequency": schedps.frequency,"monitor": schedps.monitor,}
                 
             return [self.optimizer], [self.scheduler]
-    
-    #learning-rate warmup
-    def optimizer_step(self, current_epoch, batch_nb, optimizer, *args, **kwargs):
-        if self.hparams.lr_warmup.use and self.trainer.global_step < self.hparams.lr_warmup.steps:
-            lr_scale = min(1., float(self.trainer.global_step + 1) / self.hparams.lr_warmup.steps)
-            for pg in optimizer.param_groups:
-                pg['lr'] = lr_scale * self.hparams.learning_rate
-        
-        # update params
-        optimizer.step()
-        optimizer.zero_grad()
-
 
     def train_dataloader(self, *args, **kwargs):
         bs = self.hparams.dataloader.train_bs
