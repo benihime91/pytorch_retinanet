@@ -12,8 +12,15 @@ The code is heavily influended by [Detectron2](https://github.com/facebookresear
 
 ## Tutorials:
 - <a href="https://colab.research.google.com/github/benihime91/pytorch_retinanet/blob/master/demo.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>  [demo.ipynb](https://github.com/benihime91/pytorch_retinanet/blob/master/demo.ipynb)
-  
 
+## Installing Dependencies :
+  Ensure that [python>=3.6](https://www.python.org/) , [torch>=1.6.0](https://pytorch.org/), torchvision>=0.7.0 is installed .
+   ```bash
+   $ git clone https://github.com/benihime91/pytorch_retinanet.git
+   $ cd pytorch_retinanet
+   $ pip install -r requirements.txt
+   ```
+   
 ## Usage:
    Clone the Github Repo
    ```bash
