@@ -1,4 +1,5 @@
 import argparse
+import logging
 from typing import Union
 
 import pytorch_lightning as pl
@@ -26,7 +27,7 @@ class RetinaNetModel(pl.LightningModule):
     def __init__(self, hparams: Union[DictConfig, argparse.Namespace]):
         super(RetinaNetModel, self).__init__()
         self.hparams = hparams
-        self.net = Retinanet(**hparams.model)
+        self.net = Retinanet(**hparams.model, logger=logging.getLogger("lightning"))
 
         #add learning_rate to hparams dictionary
         self.hparams.learning_rate = self.hparams.optimizer.params.lr
