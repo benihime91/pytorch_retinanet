@@ -27,7 +27,6 @@ class RetinaNetModel(pl.LightningModule):
         super(RetinaNetModel, self).__init__()
         self.hparams = hparams
         self.save_hyperparameters(hparams)
-        #initiate RetinaNet Model
         self.net = Retinanet(**hparams.model)
 
     def forward(self, xb, *args, **kwargs):
