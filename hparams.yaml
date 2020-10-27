@@ -80,3 +80,8 @@ scheduler:
   interval: epoch # (or step)
   frequency: 1
   monitor: val_loss # (or false)
+
+#adds learning-rate warmup to the model
+lr_warmup:
+  use: false #wether to use learning_rate warmup
+  steps: 500 #no. of steps to reach the learning_rate

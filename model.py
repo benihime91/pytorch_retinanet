@@ -1,16 +1,17 @@
+import argparse
+from typing import Union
+
 import pytorch_lightning as pl
 import torch
 from omegaconf import DictConfig
 from torch.utils.data import DataLoader
+
 from retinanet import Retinanet
 from utils import collate_fn, load_obj
 from utils.coco import CocoEvaluator, get_coco, get_coco_api_from_dataset
 from utils.coco.coco_transforms import Compose, RandomHorizontalFlip, ToTensor
-from utils.pascal import get_pascal, PascalDataset
+from utils.pascal import PascalDataset, get_pascal
 from utils.pascal.pascal_transforms import compose_transforms
-from typing import Union
-import argparse
-import logging
 
 
 class RetinaNetModel(pl.LightningModule):
@@ -25,6 +26,8 @@ class RetinaNetModel(pl.LightningModule):
     def __init__(self, hparams: Union[DictConfig, argparse.Namespace]):
         super(RetinaNetModel, self).__init__()
         self.hparams = hparams
+        self.save_hyperparameters(hparams)
+        #initiate RetinaNet Model
         self.net = Retinanet(**hparams.model)
 
     def forward(self, xb, *args, **kwargs):
@@ -73,29 +76,30 @@ class RetinaNetModel(pl.LightningModule):
     def configure_optimizers(self, *args, **kwargs):
         opt = self.hparams.optimizer.class_name
         self.optimizer = load_obj(opt)(self.net.parameters(), **self.hparams.optimizer.params)
-        
         if self.hparams.scheduler.class_name is None:
             return [self.optimizer]
 
         else:
             schedps = self.hparams.scheduler
             __scheduler = load_obj(schedps.class_name)(self.optimizer, **schedps.params)
-
             if not self.hparams.scheduler.monitor:
-                self.scheduler = {
-                    "scheduler": __scheduler,
-                    "interval": schedps.interval,
-                    "frequency": schedps.frequency,
-                }
+                self.scheduler = {"scheduler": __scheduler,"interval": schedps.interval,"frequency": schedps.frequency,}
             else:
-                self.scheduler = {
-                    "scheduler": __scheduler,
-                    "interval": schedps.interval,
-                    "frequency": schedps.frequency,
-                    "monitor": schedps.monitor,
-                }
-
+                self.scheduler = {"scheduler": __scheduler,"interval": schedps.interval, "frequency": schedps.frequency,"monitor": schedps.monitor,}
+                
             return [self.optimizer], [self.scheduler]
+    
+    #learning-rate warmup
+    def optimizer_step(self, current_epoch, batch_nb, optimizer, *args, **kwargs):
+        if self.hparams.lr_warmup.use and self.trainer.global_step < self.hparams.lr_warmup.steps:
+            lr_scale = min(1., float(self.trainer.global_step + 1) / self.hparams.lr_warmup.steps)
+            for pg in optimizer.param_groups:
+                pg['lr'] = lr_scale * self.hparams.learning_rate
+        
+        # update params
+        optimizer.step()
+        optimizer.zero_grad()
+
 
     def train_dataloader(self, *args, **kwargs):
         bs = self.hparams.dataloader.train_bs
