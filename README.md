@@ -47,7 +47,7 @@ The code is heavily influended by [Detectron2](https://github.com/facebookresear
     hparams = OmegaConf.load("hparams.yaml")
 
     # instantiate lightning module
-    model = RetinaNetModel(hparams=hparams)
+    model = RetinaNetModel(hparams)
     
     # Instantiate Trainer
     trainer = Trainer()
