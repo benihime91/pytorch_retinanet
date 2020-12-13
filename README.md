@@ -20,6 +20,7 @@ The code is heavily influended by [Detectron2](https://github.com/facebookresear
    $ cd pytorch_retinanet
    $ pip install -r requirements.txt
    ```
+   Note: for `pytorch-lightning` versions >= 1.0.0 t training will fail .
    
 ## Usage:
    Clone the Github Repo
